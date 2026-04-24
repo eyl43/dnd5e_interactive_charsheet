@@ -132,7 +132,7 @@ const CHAR = {
           fullDesc: "Cast time: 1 bonus action · Range: Self · Duration: Instantaneous\nComponents: V\n\nBriefly surrounded by silvery mist, you teleport up to 30 feet to an unoccupied space you can see. No other movement required. You can teleport through obstacles as long as you can see your destination.\n\nNote: Requires a verbal component only — usable while restrained (but not silenced).",
         },
         {
-          name: "Web", action: "Action", ritual: false,
+          name: "Web", action: "Action", ritual: false, conc: true,
           desc: "Concentration, 1 hr: 20-ft cube of sticky webs, difficult terrain, restrain on failed DEX save",
           fullDesc: "Cast time: 1 action · Range: 60 ft · Duration: 1 hour (concentration)\nComponents: V, S, M (a bit of spiderweb)\n\nFill a 20-ft cube from a point within range with thick sticky webs. The area is difficult terrain and lightly obscured.\n\nEach creature that enters the area or starts its turn there must make a DEX saving throw (DC 16) or be Restrained. A Restrained creature can use its action to make a STR or DEX check against your spell DC to free itself.\n\nWebs are flammable: a 5-ft section ignites when exposed to fire, burning for 1 round and dealing 2d4 fire damage to any Restrained creature that starts its turn there. The web burns away.",
         },
@@ -142,7 +142,7 @@ const CHAR = {
       slots: 2,
       list: [
         {
-          name: "Haste", action: "Action", ritual: false,
+          name: "Haste", action: "Action", ritual: false, conc: true,
           desc: "Concentration, 1 min: dbl speed, +2 AC, adv. DEX saves, extra action — lethargy on end",
           fullDesc: "Cast time: 1 action · Range: 30 ft · Duration: 1 minute (concentration)\nComponents: V, S, M (a shaving of licorice root)\n\nChoose a willing creature. For the duration:\n· Speed doubled\n· +2 bonus to AC\n· Advantage on DEX saving throws\n· Gains one additional action per turn — usable only for: Attack (one weapon attack only), Dash, Disengage, Hide, or Use an Object\n\nWhen the spell ends (including if concentration breaks), the target cannot move or take actions until after its next turn — overwhelmed by lethargy. Plan accordingly.",
         },
@@ -152,7 +152,7 @@ const CHAR = {
           fullDesc: "Cast time: 1 reaction (when a creature within 60 ft casts a spell)\nRange: 60 ft · Duration: Instantaneous\nComponents: S\n\nAttempt to interrupt a spell as it is being cast.\n· Spell is 3rd level or lower → automatically fails and has no effect\n· Spell is 4th level or higher → make a spellcasting ability check (INT): DC = 10 + the spell's level. On success: spell fails. On failure: spell resolves normally.\n\nCasting at a higher spell slot: if you upcast Counterspell, you automatically counter spells up to the slot level used (4th slot → counters up to 4th level, etc.).",
         },
         {
-          name: "Slow", action: "Action", ritual: false,
+          name: "Slow", action: "Action", ritual: false, conc: true,
           desc: "Concentration, 1 min: up to 6 creatures — halved speed, −2 AC/DEX saves, limited actions, WIS save",
           fullDesc: "Cast time: 1 action · Range: 120 ft · Duration: 1 minute (concentration)\nComponents: V, S, M (a drop of molasses)\n\nChoose up to 6 creatures in a 40-ft cube within range. Each makes a WIS saving throw or is affected:\n· Speed halved\n· −2 penalty to AC and DEX saving throws\n· Cannot use reactions\n· On their turn: may take only an action or a bonus action (not both)\n· No more than one melee or ranged attack per turn\n· When casting a spell with 1-action cast time: roll 1d20 — on 11 or lower, the spell fails and the slot is wasted\n\nAffected creature repeats the WIS save at the end of each of its turns — success ends the effect for that creature.",
         },
@@ -226,7 +226,7 @@ function StatBlock({ name, effectiveBase, effectiveMod, effectiveSave, saveProfi
       <span style={{ fontSize: 10, letterSpacing: 2, color: changed ? "#c45c3e" : "#d4a82a", textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>{name}</span>
       <span style={{ fontSize: 28, fontWeight: 700, color: "#e8dcc4", fontFamily: "'Cinzel', serif", lineHeight: 1.1, marginTop: 4 }}>{effectiveBase}</span>
       <span style={{ fontSize: 14, color: changed ? "#c45c3e" : "#a89070", fontFamily: "'Fira Code', monospace", marginTop: 2 }}>{formatMod(effectiveMod)}</span>
-      <div style={{ marginTop: 6, fontSize: 9, color: saveProficient ? "#d4a82a" : "#9a8060", letterSpacing: 1, textTransform: "uppercase" }}>
+      <div style={{ marginTop: 6, fontSize: 11, color: saveProficient ? "#d4a82a" : "#9a8060", letterSpacing: 1, textTransform: "uppercase" }}>
         Save {formatMod(effectiveSave)}{saveProficient ? " ★" : ""}
       </div>
     </div>
@@ -279,6 +279,18 @@ function ActionBadge({ type }) {
       padding: "2px 6px", borderRadius: 2, whiteSpace: "nowrap",
       verticalAlign: "middle", flexShrink: 0,
     }}>{type}</span>
+  );
+}
+
+function ConcBadge() {
+  return (
+    <span style={{
+      fontSize: 8, letterSpacing: 1, textTransform: "uppercase",
+      fontFamily: "'Fira Code', monospace",
+      background: "rgba(20,90,100,0.35)", border: "1px solid rgba(60,190,200,0.45)", color: "#80e0e8",
+      padding: "2px 6px", borderRadius: 2, whiteSpace: "nowrap",
+      verticalAlign: "middle", flexShrink: 0,
+    }}>Conc</span>
   );
 }
 
@@ -823,6 +835,7 @@ export default function CharacterSheet() {
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <span style={{ color: "#e8dcc4", fontFamily: "'Cinzel', serif", fontSize: 13 }}>{c.name}</span>
                         {c.action && <ActionBadge type={c.action} />}
+                        {c.conc && <ConcBadge />}
                       </div>
                       <span style={{ color: "#7a6a56", fontSize: 10 }}>{open ? "▲" : "▼"}</span>
                     </div>
@@ -861,6 +874,7 @@ export default function CharacterSheet() {
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <span style={{ color: "#e8dcc4", fontFamily: "'Cinzel', serif", fontSize: 13 }}>{sp.name}</span>
                           {sp.action && <ActionBadge type={sp.action} />}
+                          {sp.conc && <ConcBadge />}
                           {sp.ritual && <Tag color="rgba(139,105,20,0.3)">Ritual</Tag>}
                         </div>
                         <span style={{ color: "#7a6a56", fontSize: 10 }}>{open ? "▲" : "▼"}</span>
