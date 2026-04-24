@@ -23,7 +23,7 @@ const CHAR = {
   stats: {
     STR: { base: 8,  mod: -1, save: -1, prof: false },
     DEX: { base: 19, mod: 4,  save: 8,  prof: true  },
-    CON: { base: 14, mod: 2,  save: 6,  prof: true  },
+    CON: { base: 14, mod: 2,  save: 6,  prof: false },
     INT: { base: 18, mod: 4,  save: 4,  prof: true  },
     WIS: { base: 10, mod: 0,  save: 0,  prof: false },
     CHA: { base: 8,  mod: -1, save: -1, prof: false },
@@ -64,21 +64,25 @@ const CHAR = {
   cantrips: [
     {
       name: "Booming Blade",
+      action: "Action",
       desc: "Melee attack + 2d8 thunder on hit; 3d8 thunder if target willingly moves (lvl 12)",
       fullDesc: "Cast time: 1 action · Range: Self (5 ft) · Duration: 1 round\nComponents: S, M (a melee weapon worth 1+ sp)\n\nBrandish a weapon and make one melee attack against a creature within 5 ft. On a hit: weapon's normal damage, and the target is sheathed in booming energy until the start of your next turn. If the target willingly moves 1 or more feet before then, it takes 3d8 thunder damage and the spell ends.\n\nLevel 12 scaling (11th–16th level): +2d8 thunder on hit, +3d8 thunder if the target moves.",
     },
     {
       name: "Green-Flame Blade",
+      action: "Action",
       desc: "Melee attack + 2d8 fire; INT mod + 2d8 fire leaps to an adjacent creature (lvl 12)",
       fullDesc: "Cast time: 1 action · Range: Self (5 ft) · Duration: Instantaneous\nComponents: S, M (a melee weapon worth 1+ sp)\n\nBrandish a weapon and make one melee attack against a creature within 5 ft. On a hit: weapon's normal damage plus 2d8 fire damage. Green fire then leaps to a different creature of your choice within 5 ft of the target, dealing INT modifier + 2d8 fire damage (currently +4 or +5 fire + 2d8).\n\nLevel 12 scaling (11th–16th level): 2d8 fire on primary target, INT mod + 2d8 fire on secondary target.",
     },
     {
       name: "Prestidigitation",
+      action: "Action",
       desc: "Minor magical tricks and sensory effects",
       fullDesc: "Cast time: 1 action · Range: 10 ft · Duration: Up to 1 hour\nComponents: V, S\n\nCreate one of the following magical effects:\n· A harmless sensory effect (shower of sparks, puff of wind, faint music, odd odor)\n· Instantaneously light or snuff a small flame\n· Clean or soil an object no larger than 1 cubic foot\n· Chill, warm, or flavor up to 1 cubic foot of nonliving material for 1 hour\n· Create a small nonmagical mark or symbol on an object or surface, lasting 1 hour\n· Create a small illusory image fitting in your hand, lasting until end of your next turn\n\nUp to 3 effects can be active at once. Casting again lets you dismiss an existing effect.",
     },
     {
       name: "Mage Hand",
+      action: "Action",
       desc: "Spectral hand manipulates objects at 30 ft",
       fullDesc: "Cast time: 1 action · Range: 30 ft · Duration: 1 minute\nComponents: V, S\n\nA spectral, floating hand appears at a point you choose within range. As a bonus action, you can control the hand to:\n· Pick up, move, or manipulate an object weighing 10 lbs or less\n· Open or close an unlocked door or container\n· Retrieve an item from an open container\n· Pour the contents from a vial\n\nThe hand cannot attack, activate magic items, or carry more than 10 lbs. It vanishes if it goes more than 30 ft from you or if you recast the spell.",
     },
@@ -88,27 +92,27 @@ const CHAR = {
       slots: 4,
       list: [
         {
-          name: "Shield", ritual: false,
+          name: "Shield", action: "Reaction", ritual: false,
           desc: "+5 AC reaction (including triggering attack); immune to Magic Missile until next turn",
           fullDesc: "Cast time: 1 reaction (when hit by an attack or targeted by Magic Missile)\nRange: Self · Duration: Until the start of your next turn\nComponents: V, S\n\nAn invisible barrier of magical force springs into existence. You gain +5 bonus to AC — including against the triggering attack, potentially turning a hit into a miss. You are also immune to Magic Missile for the duration.\n\nNote: The +5 applies before the triggering attack resolves. Cast this after you see the roll but before damage is applied.",
         },
         {
-          name: "Absorb Elements", ritual: false,
+          name: "Absorb Elements", action: "Reaction", ritual: false,
           desc: "Reaction: resistance to triggering elemental damage; +1d6 of that type on next melee hit",
           fullDesc: "Cast time: 1 reaction (when you take acid, cold, fire, lightning, or thunder damage)\nRange: Self · Duration: 1 round\nComponents: S\n\nCapture some of the incoming elemental energy, lessening its effect on you. Until the start of your next turn, you have resistance to the triggering damage type (this halves the triggering damage as well). Also, the first time you hit with a melee attack on your next turn, the target takes an extra 1d6 damage of the triggering type.",
         },
         {
-          name: "Find Familiar", ritual: true,
+          name: "Find Familiar", action: "1 Hour", ritual: true,
           desc: "Summon hextech drone (owl) — telepathic link, can deliver touch spells through it",
           fullDesc: "Cast time: 1 hour (can be cast as a ritual) · Range: 10 ft · Duration: Until dismissed\nComponents: V, S, M (10 gp of charcoal, incense, and herbs consumed)\n\nSummon a spirit in the form of your hextech drone (owl). The familiar obeys your commands and has its own turn in combat.\n\nAbilities:\n· Telepathic communication within 100 ft\n· See and hear through its senses as an action (until start of your next turn)\n· Deliver touch spells through the familiar if within 100 ft (uses your attack roll if applicable)\n· Dismiss to a pocket dimension as an action; recall within 30 ft as a bonus action\n\nThe familiar cannot attack. If reduced to 0 HP it vanishes; re-summon with the ritual. Only one familiar at a time.",
         },
         {
-          name: "Silvery Barbs", ritual: false,
+          name: "Silvery Barbs", action: "Reaction", ritual: false,
           desc: "Reaction: force reroll on a success, grant advantage to an ally on next d20",
           fullDesc: "Cast time: 1 reaction (when a creature you can see within 60 ft succeeds on an attack roll, ability check, or saving throw)\nRange: 60 ft · Duration: Instantaneous\nComponents: V\n\nYou magically distract the triggering creature and redirect its momentary fortune. The creature must reroll the d20 and use the lower result.\n\nThen choose a different creature you can see within 60 ft (can be yourself). That creature has advantage on its next attack roll, ability check, or saving throw made within the next minute.",
         },
         {
-          name: "Feather Fall", ritual: false,
+          name: "Feather Fall", action: "Reaction", ritual: false,
           desc: "Reaction: slow up to 5 falling creatures to safe speed, no fall damage",
           fullDesc: "Cast time: 1 reaction (when you or a creature within 60 ft falls)\nRange: 60 ft · Duration: 1 minute\nComponents: V, M (a small feather or piece of down)\n\nChoose up to 5 falling creatures within range. Each chosen creature's rate of descent slows to 60 ft per round — slow enough to avoid all falling damage. A creature that lands while under this effect takes no damage from the fall and can land on its feet.\n\nSpell ends when the duration expires or all chosen creatures have landed.",
         },
@@ -118,17 +122,17 @@ const CHAR = {
       slots: 3,
       list: [
         {
-          name: "Mirror Image", ritual: false,
+          name: "Mirror Image", action: "Action", ritual: false,
           desc: "3 illusory duplicates, no concentration — attackers may hit a duplicate instead",
           fullDesc: "Cast time: 1 action · Range: Self · Duration: 1 minute\nComponents: V, S · No concentration required\n\n3 illusory duplicates of yourself accompany you. When a creature targets you with an attack, roll 1d20 to determine if the attack hits a duplicate instead:\n· 3 duplicates present → hits duplicate on 6+\n· 2 duplicates present → hits duplicate on 8+\n· 1 duplicate present → hits duplicate on 11+\n\nDuplicate AC = 10 + DEX modifier. A hit destroys the duplicate. Duplicates are immune to effects not requiring attack rolls (spells, AoE, grapple, etc.). Spell ends when all 3 duplicates are destroyed or duration expires.",
         },
         {
-          name: "Misty Step", ritual: false,
+          name: "Misty Step", action: "Bonus", ritual: false,
           desc: "Bonus action: teleport up to 30 ft to a visible unoccupied space",
           fullDesc: "Cast time: 1 bonus action · Range: Self · Duration: Instantaneous\nComponents: V\n\nBriefly surrounded by silvery mist, you teleport up to 30 feet to an unoccupied space you can see. No other movement required. You can teleport through obstacles as long as you can see your destination.\n\nNote: Requires a verbal component only — usable while restrained (but not silenced).",
         },
         {
-          name: "Web", ritual: false,
+          name: "Web", action: "Action", ritual: false,
           desc: "Concentration, 1 hr: 20-ft cube of sticky webs, difficult terrain, restrain on failed DEX save",
           fullDesc: "Cast time: 1 action · Range: 60 ft · Duration: 1 hour (concentration)\nComponents: V, S, M (a bit of spiderweb)\n\nFill a 20-ft cube from a point within range with thick sticky webs. The area is difficult terrain and lightly obscured.\n\nEach creature that enters the area or starts its turn there must make a DEX saving throw (DC 16) or be Restrained. A Restrained creature can use its action to make a STR or DEX check against your spell DC to free itself.\n\nWebs are flammable: a 5-ft section ignites when exposed to fire, burning for 1 round and dealing 2d4 fire damage to any Restrained creature that starts its turn there. The web burns away.",
         },
@@ -138,22 +142,22 @@ const CHAR = {
       slots: 2,
       list: [
         {
-          name: "Haste", ritual: false,
+          name: "Haste", action: "Action", ritual: false,
           desc: "Concentration, 1 min: dbl speed, +2 AC, adv. DEX saves, extra action — lethargy on end",
           fullDesc: "Cast time: 1 action · Range: 30 ft · Duration: 1 minute (concentration)\nComponents: V, S, M (a shaving of licorice root)\n\nChoose a willing creature. For the duration:\n· Speed doubled\n· +2 bonus to AC\n· Advantage on DEX saving throws\n· Gains one additional action per turn — usable only for: Attack (one weapon attack only), Dash, Disengage, Hide, or Use an Object\n\nWhen the spell ends (including if concentration breaks), the target cannot move or take actions until after its next turn — overwhelmed by lethargy. Plan accordingly.",
         },
         {
-          name: "Counterspell", ritual: false,
+          name: "Counterspell", action: "Reaction", ritual: false,
           desc: "Reaction: automatically counter spells ≤3rd level; roll INT check vs. higher-level spells",
           fullDesc: "Cast time: 1 reaction (when a creature within 60 ft casts a spell)\nRange: 60 ft · Duration: Instantaneous\nComponents: S\n\nAttempt to interrupt a spell as it is being cast.\n· Spell is 3rd level or lower → automatically fails and has no effect\n· Spell is 4th level or higher → make a spellcasting ability check (INT): DC = 10 + the spell's level. On success: spell fails. On failure: spell resolves normally.\n\nCasting at a higher spell slot: if you upcast Counterspell, you automatically counter spells up to the slot level used (4th slot → counters up to 4th level, etc.).",
         },
         {
-          name: "Slow", ritual: false,
+          name: "Slow", action: "Action", ritual: false,
           desc: "Concentration, 1 min: up to 6 creatures — halved speed, −2 AC/DEX saves, limited actions, WIS save",
           fullDesc: "Cast time: 1 action · Range: 120 ft · Duration: 1 minute (concentration)\nComponents: V, S, M (a drop of molasses)\n\nChoose up to 6 creatures in a 40-ft cube within range. Each makes a WIS saving throw or is affected:\n· Speed halved\n· −2 penalty to AC and DEX saving throws\n· Cannot use reactions\n· On their turn: may take only an action or a bonus action (not both)\n· No more than one melee or ranged attack per turn\n· When casting a spell with 1-action cast time: roll 1d20 — on 11 or lower, the spell fails and the slot is wasted\n\nAffected creature repeats the WIS save at the end of each of its turns — success ends the effect for that creature.",
         },
         {
-          name: "Fireball", ritual: false,
+          name: "Fireball", action: "Action", ritual: false,
           desc: "8d6 fire in 20-ft radius, DEX save for half — spreads around corners",
           fullDesc: "Cast time: 1 action · Range: 150 ft · Duration: Instantaneous\nComponents: V, S, M (a tiny ball of bat guano and sulfur)\n\nA bright streak flashes to a point you choose within range and blossoms into a 20-ft radius sphere of roaring flame. Each creature in the sphere makes a DEX saving throw (DC 16):\n· Failed save: 8d6 fire damage (avg ~28)\n· Successful save: half damage\n\nThe fire spreads around corners. Nonmagical flammable objects that are not worn or carried are ignited. A solid obstruction (wall, pillar) can block the spread in that direction.",
         },
@@ -161,76 +165,26 @@ const CHAR = {
     },
   },
   features: [
-    {
-      name: "Crimson Rite",
-      source: "Blood Hunter",
-      desc: "Sacrifice HP to imbue weapon with elemental damage (1d6). Lasts until rest or dropped. Cold and Lightning.",
-    },
-    {
-      name: "Mutagens (Strange Metabolism — 2 active)",
-      source: "Mutant Order 7",
-      desc: "Click mutagen cards above to toggle them. Strange Metabolism allows 2 active simultaneously. Each mutagen enhances one aspect at the cost of another.",
-    },
-    {
-      name: "Strange Metabolism",
-      source: "Mutant Order 7",
-      desc: "Your body has adapted to process multiple mutagens simultaneously. You can have up to 2 mutagens active at once. When imbibing a third, choose which active one ends.",
-    },
-    {
-      name: "Blood Maledict",
-      source: "Blood Hunter",
-      desc: "(2/short rest) Invoke a curse, before it affects the target choose to amplify by necrotic dmg equal to hemocraft die ",
-    },
-    {
-      name: "Brand of Castigation",
-      source: "Blood Hunter 6",
-      desc: "Marked target takes INT mod psychic damage (+4) when it damages you. Direction of branded creature always known on same plane",
-    },
-    {
-      name: "Blood Curse of the Eyeless",
-      source: "Blood Hunter",
-      desc: "Reaction: impose subtraction on attack (hemocraft die, - number rolled). Amplify: all attacks until end of turn.",
-    },
-    {
-      name: "Blood Curse of the Fallen Puppet",
-      source: "Blood Hunter",
-      desc: "Reaction: creature at 0 HP makes one melee attack. Amplify: cause creature to move 1/2 its speed, grant bonus on attack roll equal to INT mod (+4 base).",
-    },
-    {
-      name: "Bladesong",
-      source: "Wizard (Bladesinger)",
-      desc: "Bonus action: +INT to AC & Concentration, +10 speed, adv. on Acrobatics. 4/long rest.",
-    },
-    {
-      name: "Arcane Recovery",
-      source: "Wizard",
-      desc: "1/day choose expended spell slots to recover (3 slots)",
-    },
-    {
-      name: "Extra Attack",
-      source: "Blood Hunter 5",
-      desc: "Attack twice when taking the Attack action.",
-    },
-    {
-      name: "Darkvision",
-      source: "Custom Lineage",
-      desc: "See in dim light 60ft as bright, darkness as dim light.",
-    },
-    {
-      name: "Hunter's Bane",
-      source: "Blood Hunter 1",
-      desc: "Advantage on INT checks to recall info about fey, fiends, and undead. Advantage on tracking them.",
-    },
-    {
-      name: "Fighting Style: Dueling",
-      source: "Blood Hunter 2",
-      desc: "+2 damage with one-handed melee weapon, no other weapon in hand.",
-    },
-    {
-      name: "Gunner",
-      source: "Feat",
-      desc: "+1 DEX. Proficiency with firearms. Ignore the loading property of firearms. Being within 5ft of a hostile creature doesn't impose disadvantage on ranged attack rolls.",
-    },
+    // ── Character Level 1 ──────────────────────────────────────────
+    { name: "Hunter's Bane",          source: "Blood Hunter 1",     action: "Passive",  desc: "Advantage on INT checks to recall info about fey, fiends, and undead. Advantage on tracking them." },
+    { name: "Blood Maledict",         source: "Blood Hunter 1",     action: "Bonus",    desc: "(2/short rest) Invoke a blood curse as a bonus action. Before a curse affects its target you may amplify it, dealing necrotic damage equal to your hemocraft die (1d6) — this damage cannot be reduced or mitigated." },
+    { name: "Blood Curse of the Eyeless", source: "Blood Hunter 1", action: "Reaction", desc: "Reaction: when a creature you can see makes an attack roll, roll your hemocraft die and subtract the result from the attack. Amplify: the subtraction applies to ALL attacks the creature makes until the end of its next turn." },
+    { name: "Darkvision",             source: "Custom Lineage 1",   action: "Passive",  desc: "See in dim light within 60 ft as if bright light, and in darkness as if dim light. Can't discern color in darkness." },
+    { name: "Gunner",                 source: "Feat (Level 1)",     action: "Passive",  desc: "+1 DEX (already included in stats). Proficiency with firearms. Ignore the loading property of firearms. Being within 5 ft of a hostile creature does not impose disadvantage on ranged attack rolls." },
+    // ── Character Level 2 ──────────────────────────────────────────
+    { name: "Fighting Style: Dueling", source: "Blood Hunter 2",   action: "Passive",  desc: "+2 damage when wielding a melee weapon in one hand and no other weapons." },
+    { name: "Crimson Rite",           source: "Blood Hunter 2",     action: "Bonus",    desc: "Bonus action: sacrifice HP (1d6 necrotic) to imbue your weapon with elemental energy — adding 1d6 elemental damage on each hit. Lasts until you rest or drop the weapon. Currently attuned: Cold and Lightning." },
+    // ── Character Level 5 ──────────────────────────────────────────
+    { name: "Extra Attack",           source: "Blood Hunter 5",     action: "Passive",  desc: "Attack twice, instead of once, when you take the Attack action on your turn." },
+    // ── Character Level 6 ──────────────────────────────────────────
+    { name: "Brand of Castigation",  source: "Blood Hunter 6",      action: "Passive",  desc: "When you hit a creature with a weapon attack, you can brand it. A branded creature takes INT modifier psychic damage (+4 or +5) each time it deals damage to you. You always know the direction of a branded creature on the same plane." },
+    // ── Character Level 7 (Blood Hunter 7) ────────────────────────
+    { name: "Strange Metabolism",     source: "Mutant Order 7",     action: "Passive",  desc: "Your body can sustain 2 mutagens simultaneously. Imbibing a third requires you to choose which active one ends. Imbibing a mutagen takes an action and costs no HP." },
+    { name: "Blood Curse of the Fallen Puppet", source: "Blood Hunter 7", action: "Reaction", desc: "Reaction: when a creature you can see drops to 0 HP, force it to immediately make one melee weapon attack against a target of your choice. Amplify: the creature also moves up to half its speed before attacking, and gains a bonus to the attack roll equal to your INT modifier (+4 or +5)." },
+    // ── Character Level 8 (Wizard 1) ──────────────────────────────
+    { name: "Arcane Recovery",        source: "Wizard 1",           action: "Special",  desc: "Once per day when you finish a short rest, recover expended spell slots with a combined level of up to half your Wizard level (rounded up). Slots recovered: up to 3 levels total (e.g. one 3rd-level, or one 2nd + one 1st)." },
+    // ── Character Level 9 (Wizard 2 — Bladesinger) ────────────────
+    { name: "Bladesong",              source: "Bladesinger 2",      action: "Bonus",    desc: "Bonus action: begin the Bladesong for 1 minute. While active: +INT modifier to AC (already reflected above when toggled), +10 ft speed, advantage on Acrobatics checks, and +INT modifier to concentration saving throws. Ends early if you don armor, are incapacitated, or use two hands to make an attack. 4 uses per long rest." },
   ],
   mutagens: [
     { name: "Celerity",       benefit: "+3 DEX",                                  drawback: "-3 STR"       },
@@ -303,6 +257,28 @@ function Tag({ children, color }) {
       background: color || "rgba(139,28,28,0.25)", color: "#e8dcc4", padding: "2px 8px",
       borderRadius: 2, fontFamily: "'Fira Code', monospace", marginRight: 4, marginBottom: 2,
     }}>{children}</span>
+  );
+}
+
+const ACTION_STYLES = {
+  "Action":   { bg: "rgba(139,28,28,0.3)",   border: "rgba(180,60,60,0.55)",  color: "#f0a0a0" },
+  "Bonus":    { bg: "rgba(120,90,10,0.35)",  border: "rgba(212,168,42,0.55)", color: "#f0d060" },
+  "Reaction": { bg: "rgba(30,70,160,0.3)",   border: "rgba(90,140,255,0.5)",  color: "#a0c0ff" },
+  "Passive":  { bg: "rgba(50,44,38,0.5)",    border: "rgba(100,90,75,0.4)",   color: "#9a8060" },
+  "1 Hour":   { bg: "rgba(90,40,140,0.3)",   border: "rgba(160,90,255,0.45)", color: "#c8a0ff" },
+  "Special":  { bg: "rgba(20,80,70,0.35)",   border: "rgba(50,160,140,0.5)",  color: "#80d8c8" },
+};
+
+function ActionBadge({ type }) {
+  const s = ACTION_STYLES[type] || ACTION_STYLES["Passive"];
+  return (
+    <span style={{
+      fontSize: 8, letterSpacing: 1, textTransform: "uppercase",
+      fontFamily: "'Fira Code', monospace",
+      background: s.bg, border: `1px solid ${s.border}`, color: s.color,
+      padding: "2px 6px", borderRadius: 2, whiteSpace: "nowrap",
+      verticalAlign: "middle", flexShrink: 0,
+    }}>{type}</span>
   );
 }
 
@@ -635,6 +611,20 @@ export default function CharacterSheet() {
           ))}
         </div>
 
+        {/* Immunities */}
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 9, letterSpacing: 2, color: "#9a8060", textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>Immune</span>
+          {["Poison Damage", "Poisoned Condition"].map((label) => (
+            <span key={label} style={{
+              fontSize: 9, letterSpacing: 1, textTransform: "uppercase",
+              fontFamily: "'Fira Code', monospace",
+              background: "rgba(30,90,30,0.3)", border: "1px solid rgba(60,160,60,0.4)", color: "#80c880",
+              padding: "2px 8px", borderRadius: 2,
+            }}>{label}</span>
+          ))}
+          <span style={{ fontSize: 10, color: "#7a6a56", fontFamily: "'EB Garamond', serif", fontStyle: "italic" }}>Strange Metabolism</span>
+        </div>
+
         {/* Tab Navigation */}
         <div style={{ display: "flex", gap: 0, marginBottom: 20, borderBottom: "1px solid rgba(139,28,28,0.3)" }}>
           {tabs.map((t) => (
@@ -829,8 +819,11 @@ export default function CharacterSheet() {
                       transition: "all 0.2s",
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                      <span style={{ color: "#e8dcc4", fontFamily: "'Cinzel', serif", fontSize: 13 }}>{c.name}</span>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ color: "#e8dcc4", fontFamily: "'Cinzel', serif", fontSize: 13 }}>{c.name}</span>
+                        {c.action && <ActionBadge type={c.action} />}
+                      </div>
                       <span style={{ color: "#7a6a56", fontSize: 10 }}>{open ? "▲" : "▼"}</span>
                     </div>
                     <div style={{ color: "#9a8060", fontSize: 12, marginTop: 2 }}>{c.desc}</div>
@@ -864,9 +857,10 @@ export default function CharacterSheet() {
                         transition: "all 0.2s",
                       }}
                     >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 6 }}>
-                        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <span style={{ color: "#e8dcc4", fontFamily: "'Cinzel', serif", fontSize: 13 }}>{sp.name}</span>
+                          {sp.action && <ActionBadge type={sp.action} />}
                           {sp.ritual && <Tag color="rgba(139,105,20,0.3)">Ritual</Tag>}
                         </div>
                         <span style={{ color: "#7a6a56", fontSize: 10 }}>{open ? "▲" : "▼"}</span>
@@ -974,9 +968,10 @@ export default function CharacterSheet() {
                       borderRadius: 3, transition: "all 0.2s",
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 6 }}>
-                      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                         <span style={{ fontFamily: "'Cinzel', serif", color: "#e8dcc4", fontSize: 14 }}>{f.name}</span>
+                        {f.action && <ActionBadge type={f.action} />}
                         <Tag>{f.source}</Tag>
                       </div>
                       <span style={{ color: "#7a6a56", fontSize: 10 }}>{open ? "▲" : "▼"}</span>
@@ -1031,8 +1026,11 @@ export default function CharacterSheet() {
                       borderRadius: 3, transition: "all 0.2s",
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                      <span style={{ fontFamily: "'Cinzel', serif", color: "#e8dcc4", fontSize: 14 }}>{f.name}</span>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontFamily: "'Cinzel', serif", color: "#e8dcc4", fontSize: 14 }}>{f.name}</span>
+                        {f.action && <ActionBadge type={f.action} />}
+                      </div>
                       <span style={{ color: "#7a6a56", fontSize: 10 }}>{open ? "▲" : "▼"}</span>
                     </div>
                     {open && (
