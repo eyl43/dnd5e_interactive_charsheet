@@ -71,8 +71,8 @@ const CHAR = {
     {
       name: "Green-Flame Blade",
       action: "Action",
-      desc: "Melee attack + 2d8 fire; INT mod + 2d8 fire leaps to an adjacent creature (lvl 12)",
-      fullDesc: "Cast time: 1 action · Range: Self (5 ft) · Duration: Instantaneous\nComponents: S, M (a melee weapon worth 1+ sp)\n\nBrandish a weapon and make one melee attack against a creature within 5 ft. On a hit: weapon's normal damage plus 2d8 fire damage. Green fire then leaps to a different creature of your choice within 5 ft of the target, dealing INT modifier + 2d8 fire damage (currently +4 or +5 fire + 2d8).\n\nLevel 12 scaling (11th–16th level): 2d8 fire on primary target, INT mod + 2d8 fire on secondary target.",
+      desc: "Melee attack + 2d8 fire; {intMod} + 2d8 fire leaps to an adjacent creature (lvl 12)",
+      fullDesc: "Cast time: 1 action · Range: Self (5 ft) · Duration: Instantaneous\nComponents: S, M (a melee weapon worth 1+ sp)\n\nBrandish a weapon and make one melee attack against a creature within 5 ft. On a hit: weapon's normal damage plus 2d8 fire damage. Green fire then leaps to a different creature of your choice within 5 ft of the target, dealing {intMod} + 2d8 fire damage.\n\nLevel 12 scaling (11th–16th level): 2d8 fire on primary target, {intMod} + 2d8 fire on secondary target.",
     },
     {
       name: "Prestidigitation",
@@ -124,7 +124,7 @@ const CHAR = {
         {
           name: "Mirror Image", action: "Action", ritual: false,
           desc: "3 illusory duplicates, no concentration — attackers may hit a duplicate instead",
-          fullDesc: "Cast time: 1 action · Range: Self · Duration: 1 minute\nComponents: V, S · No concentration required\n\n3 illusory duplicates of yourself accompany you. When a creature targets you with an attack, roll 1d20 to determine if the attack hits a duplicate instead:\n· 3 duplicates present → hits duplicate on 6+\n· 2 duplicates present → hits duplicate on 8+\n· 1 duplicate present → hits duplicate on 11+\n\nDuplicate AC = 10 + DEX modifier. A hit destroys the duplicate. Duplicates are immune to effects not requiring attack rolls (spells, AoE, grapple, etc.). Spell ends when all 3 duplicates are destroyed or duration expires.",
+          fullDesc: "Cast time: 1 action · Range: Self · Duration: 1 minute\nComponents: V, S · No concentration required\n\n3 illusory duplicates of yourself accompany you. When a creature targets you with an attack, roll 1d20 to determine if the attack hits a duplicate instead:\n· 3 duplicates present → hits duplicate on 6+\n· 2 duplicates present → hits duplicate on 8+\n· 1 duplicate present → hits duplicate on 11+\n\nDuplicate AC = {mirrorAC}. A hit destroys the duplicate. Duplicates are immune to effects not requiring attack rolls (spells, AoE, grapple, etc.). Spell ends when all 3 duplicates are destroyed or duration expires.",
         },
         {
           name: "Misty Step", action: "Bonus", ritual: false,
@@ -134,7 +134,7 @@ const CHAR = {
         {
           name: "Web", action: "Action", ritual: false, conc: true,
           desc: "Concentration, 1 hr: 20-ft cube of sticky webs, difficult terrain, restrain on failed DEX save",
-          fullDesc: "Cast time: 1 action · Range: 60 ft · Duration: 1 hour (concentration)\nComponents: V, S, M (a bit of spiderweb)\n\nFill a 20-ft cube from a point within range with thick sticky webs. The area is difficult terrain and lightly obscured.\n\nEach creature that enters the area or starts its turn there must make a DEX saving throw (DC 16) or be Restrained. A Restrained creature can use its action to make a STR or DEX check against your spell DC to free itself.\n\nWebs are flammable: a 5-ft section ignites when exposed to fire, burning for 1 round and dealing 2d4 fire damage to any Restrained creature that starts its turn there. The web burns away.",
+          fullDesc: "Cast time: 1 action · Range: 60 ft · Duration: 1 hour (concentration)\nComponents: V, S, M (a bit of spiderweb)\n\nFill a 20-ft cube from a point within range with thick sticky webs. The area is difficult terrain and lightly obscured.\n\nEach creature that enters the area or starts its turn there must make a DEX saving throw (DC {dc}) or be Restrained. A Restrained creature can use its action to make a STR or DEX check against your spell DC to free itself.\n\nWebs are flammable: a 5-ft section ignites when exposed to fire, burning for 1 round and dealing 2d4 fire damage to any Restrained creature that starts its turn there. The web burns away.",
         },
       ],
     },
@@ -154,12 +154,12 @@ const CHAR = {
         {
           name: "Slow", action: "Action", ritual: false, conc: true,
           desc: "Concentration, 1 min: up to 6 creatures — halved speed, −2 AC/DEX saves, limited actions, WIS save",
-          fullDesc: "Cast time: 1 action · Range: 120 ft · Duration: 1 minute (concentration)\nComponents: V, S, M (a drop of molasses)\n\nChoose up to 6 creatures in a 40-ft cube within range. Each makes a WIS saving throw or is affected:\n· Speed halved\n· −2 penalty to AC and DEX saving throws\n· Cannot use reactions\n· On their turn: may take only an action or a bonus action (not both)\n· No more than one melee or ranged attack per turn\n· When casting a spell with 1-action cast time: roll 1d20 — on 11 or lower, the spell fails and the slot is wasted\n\nAffected creature repeats the WIS save at the end of each of its turns — success ends the effect for that creature.",
+          fullDesc: "Cast time: 1 action · Range: 120 ft · Duration: 1 minute (concentration)\nComponents: V, S, M (a drop of molasses)\n\nChoose up to 6 creatures in a 40-ft cube within range. Each makes a WIS saving throw (DC {dc}) or is affected:\n· Speed halved\n· −2 penalty to AC and DEX saving throws\n· Cannot use reactions\n· On their turn: may take only an action or a bonus action (not both)\n· No more than one melee or ranged attack per turn\n· When casting a spell with 1-action cast time: roll 1d20 — on 11 or lower, the spell fails and the slot is wasted\n\nAffected creature repeats the WIS save at the end of each of its turns — success ends the effect for that creature.",
         },
         {
           name: "Fireball", action: "Action", ritual: false,
           desc: "8d6 fire in 20-ft radius, DEX save for half — spreads around corners",
-          fullDesc: "Cast time: 1 action · Range: 150 ft · Duration: Instantaneous\nComponents: V, S, M (a tiny ball of bat guano and sulfur)\n\nA bright streak flashes to a point you choose within range and blossoms into a 20-ft radius sphere of roaring flame. Each creature in the sphere makes a DEX saving throw (DC 16):\n· Failed save: 8d6 fire damage (avg ~28)\n· Successful save: half damage\n\nThe fire spreads around corners. Nonmagical flammable objects that are not worn or carried are ignited. A solid obstruction (wall, pillar) can block the spread in that direction.",
+          fullDesc: "Cast time: 1 action · Range: 150 ft · Duration: Instantaneous\nComponents: V, S, M (a tiny ball of bat guano and sulfur)\n\nA bright streak flashes to a point you choose within range and blossoms into a 20-ft radius sphere of roaring flame. Each creature in the sphere makes a DEX saving throw (DC {dc}):\n· Failed save: 8d6 fire damage (avg ~28)\n· Successful save: half damage\n\nThe fire spreads around corners. Nonmagical flammable objects that are not worn or carried are ignited. A solid obstruction (wall, pillar) can block the spread in that direction.",
         },
       ],
     },
@@ -233,19 +233,54 @@ function StatBlock({ name, effectiveBase, effectiveMod, effectiveSave, saveProfi
   );
 }
 
-function Section({ title, children, accent }) {
+function Section({ title, children, accent, right }) {
   return (
     <div style={{ marginBottom: 20 }}>
       <div style={{
         display: "flex", alignItems: "center", gap: 10, marginBottom: 10,
         borderBottom: `1px solid ${accent || "rgba(139,28,28,0.4)"}`, paddingBottom: 6,
+        justifyContent: "space-between",
       }}>
         <span style={{
           fontSize: 11, letterSpacing: 3, textTransform: "uppercase",
           color: accent || "#8b1c1c", fontFamily: "'Cinzel', serif", fontWeight: 700,
         }}>{title}</span>
+        {right}
       </div>
       {children}
+    </div>
+  );
+}
+
+function PipTracker({ total, remaining, onSet, color = "#a0b8e8", onReset }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+      {Array.from({ length: total }).map((_, i) => (
+        <div
+          key={i}
+          onClick={(e) => { e.stopPropagation(); onSet(i < remaining ? i : i + 1); }}
+          style={{
+            width: 13, height: 13, borderRadius: "50%", cursor: "pointer",
+            background: i < remaining ? color : "transparent",
+            border: `1px solid ${i < remaining ? color : "rgba(139,28,28,0.35)"}`,
+            boxShadow: i < remaining ? `0 0 5px ${color}66` : "none",
+            transition: "all 0.15s", flexShrink: 0,
+          }}
+        />
+      ))}
+      <span style={{ fontFamily: "'Fira Code', monospace", fontSize: 10, color: "#7a6a56", marginLeft: 2 }}>
+        {remaining}/{total}
+      </span>
+      {onReset && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onReset(); }}
+          style={{
+            background: "rgba(139,28,28,0.18)", border: "1px solid rgba(139,28,28,0.35)",
+            color: "#c4b49a", fontFamily: "'Cinzel', serif", fontSize: 8, letterSpacing: 1,
+            textTransform: "uppercase", padding: "2px 6px", borderRadius: 2, cursor: "pointer", marginLeft: 4,
+          }}
+        >Rest</button>
+      )}
     </div>
   );
 }
@@ -308,6 +343,11 @@ export default function CharacterSheet() {
   const [currentHp, setCurrentHp] = useState(CHAR.hp.current);
   const [tempHp, setTempHp] = useState(CHAR.hp.temp);
   const [tab, setTab] = useState("combat");
+  const [spellSlots, setSpellSlots] = useState(
+    Object.fromEntries(Object.entries(CHAR.spells).map(([lvl, d]) => [lvl, d.slots]))
+  );
+  const [bladesongUsesLeft, setBladesongUsesLeft] = useState(4);
+  const [mutageNDoses, setMutageNDoses] = useState(4);
   const [lore, setLore] = useState({
     history: "Dr. Lucien Harrow had, for most of his life, known that he was the prime example for why certain rules and regulations were written. However, his widespread research success and influence on politics and academic funding encouraged officials and deans alike to turn a blind eye to blatant violations of safety and code of conduct. Currently at the height of his career, he holds a senior position at the Thalmurian Institute of Magic, where he is renowned for breakthroughs in applied arcanotech, battlefield thaumaturgy, and most recently amplified moonglow. His patents single handedly funded great portions of the city watch and private consortium research. His grants filled university coffers, encouraging academic tourism from across the continent.  His famously dry, unenthusiastic lectures on inventions of generational importance packed auditoriums and encouraged the construction of two separate expansions for standing-room only attendees. Although scholars who attended were often left confused as to whether they had been instructed or insulted, all were eager to return for greater insight into the professor’s work. The university, as a result, had no choice but to turn a blind eye to what board members found to be distasteful, ethically indefensible, yet incredibly profitable methods. Harrow’s reputation as the premier Thalmurian tracker was stranger still. Inside the city, he was also considered the foremost living authority on pursuit of beasts, fugitives, the occult, and, more often than not, people. He possessed an unnerving intelligence and a talent for deduction. Many of his coworkers often admitted that conversations with Harrow often felt more like dissections. When the noble houses or city government wanted problems solved without a public spectacle, Harrow was the man for the job. He always accepted, as long as the suspect could be ‘harvested’ for research. The city constables often ignored missing organs from the deceased. Harrow’s graduate students knew him as a tyrant of perfection.He was wholly uninterested in morale, and was well known for graduating only 10% of the students who entered his lab.Nobody ever left his tutelage completely intact, in either the physical, magical, or mental sense.Public morality was a cute theater for the professor, and political office to be elaborate mechanisms of control for which there were far more direct solutions.Yet despite his unyielding personality, many were still hungry for every word that the professor would offer.Perhaps he only considered his peers, which there were precious few, to be worth his time and consideration. Very little is known about Harrow’s formative years before the university.It is known that he began as a graduate student at the Thalmurian Institute directly after serving as an imperial architecti in the first Thalmurian- Mageocracy conflict.However, the history books are crystal clear about the accounts of widespread cruelty inflicted by the Mageocracy on and off the battlefield.Rumors mention that Harrow perfected his hemocracy here on the blood - rich battlefields.It is one of the few research discoveries that he has kept to himself.His success in the university and field have made him a legendary fighter.Despite his contempt for hubris, some of his graduate students have whispered that Harrow proudly displays a clipping of the bounty the Mageocracy has placed on his head.But it seems he feels no pride in his talents. *When something flees beneath the ground, they call the doctor when they want it found.*",
     personality:  "Laconic, pessimistic, 'nam level boomer' vibe",
@@ -371,6 +411,16 @@ export default function CharacterSheet() {
   const effectiveSpeed = bladesongActive ? baseSpeed + 10 : baseSpeed;
   const speedDisplay = bladesongActive ? `${effectiveSpeed} ft ♪` : `${effectiveSpeed} ft`;
 
+  const resolveSpellText = (text) => {
+    if (!text) return text;
+    return text
+      .replace(/\{intMod\}/g, formatMod(intMod))
+      .replace(/\{dexMod\}/g, formatMod(dexMod))
+      .replace(/\{dc\}/g, dcDisplay)
+      .replace(/\{spellAtk\}/g, spellAtkDisplay)
+      .replace(/\{mirrorAC\}/g, String(10 + dexMod));
+  };
+
   return (
     <div style={{
       fontFamily: "'EB Garamond', 'Georgia', serif",
@@ -403,6 +453,22 @@ export default function CharacterSheet() {
             Custom Lineage · Level 12 · Feat: Gunner
           </div>
           <div style={{ width: 60, height: 1, background: "linear-gradient(90deg, transparent, #8b1c1c, transparent)", margin: "16px auto 0" }} />
+          <button
+            onClick={() => {
+              setSpellSlots(Object.fromEntries(Object.entries(CHAR.spells).map(([lvl, d]) => [lvl, d.slots])));
+              setBladesongUsesLeft(4);
+              setMutageNDoses(4);
+              setBloodCurseUses(CHAR.profBonus);
+            }}
+            style={{
+              marginTop: 14, background: "rgba(139,28,28,0.15)", border: "1px solid rgba(139,28,28,0.45)",
+              color: "#c4b49a", fontFamily: "'Cinzel', serif", fontSize: 10, letterSpacing: 3,
+              textTransform: "uppercase", padding: "6px 20px", borderRadius: 2, cursor: "pointer",
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={(e) => { e.target.style.background = "rgba(139,28,28,0.3)"; e.target.style.color = "#e8dcc4"; }}
+            onMouseLeave={(e) => { e.target.style.background = "rgba(139,28,28,0.15)"; e.target.style.color = "#c4b49a"; }}
+          >⚭ Long Rest</button>
         </div>
 
         {/* Mutagen Toggles */}
@@ -512,6 +578,19 @@ export default function CharacterSheet() {
               </span>
             )}
           </button>
+        </div>
+
+        {/* Resource Trackers */}
+        <div style={{ display: "flex", gap: 24, justifyContent: "center", flexWrap: "wrap", marginBottom: 20, padding: "10px 16px", background: "rgba(20,16,14,0.4)", border: "1px solid rgba(139,28,28,0.15)", borderRadius: 3 }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 9, letterSpacing: 2, color: "#a0b8e8", textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>Bladesong</span>
+            <PipTracker total={4} remaining={bladesongUsesLeft} onSet={setBladesongUsesLeft} color="#a0b8e8" />
+          </div>
+          <div style={{ width: 1, background: "rgba(139,28,28,0.2)", alignSelf: "stretch" }} />
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 9, letterSpacing: 2, color: "#d4a82a", textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>Mutagen Doses</span>
+            <PipTracker total={4} remaining={mutageNDoses} onSet={setMutageNDoses} color="#d4a82a" />
+          </div>
         </div>
 
         {/* Stat Blocks */}
@@ -839,7 +918,7 @@ export default function CharacterSheet() {
                       </div>
                       <span style={{ color: "#7a6a56", fontSize: 10 }}>{open ? "▲" : "▼"}</span>
                     </div>
-                    <div style={{ color: "#9a8060", fontSize: 12, marginTop: 2 }}>{c.desc}</div>
+                    <div style={{ color: "#9a8060", fontSize: 12, marginTop: 2 }}>{resolveSpellText(c.desc)}</div>
                     {open && (
                       <div style={{
                         marginTop: 10, padding: "10px 12px",
@@ -848,7 +927,7 @@ export default function CharacterSheet() {
                         whiteSpace: "pre-line",
                         borderTop: "1px solid rgba(139,105,20,0.2)",
                       }}>
-                        {c.fullDesc}
+                        {resolveSpellText(c.fullDesc)}
                       </div>
                     )}
                   </div>
@@ -856,7 +935,14 @@ export default function CharacterSheet() {
               })}
             </Section>
             {Object.entries(CHAR.spells).map(([level, data]) => (
-              <Section key={level} title={`${level} Level — ${data.slots} slots`}>
+              <Section key={level} title={`${level} Level`} right={
+                <PipTracker
+                  total={data.slots}
+                  remaining={spellSlots[level]}
+                  onSet={(v) => setSpellSlots(prev => ({ ...prev, [level]: v }))}
+                  color="#8ab4d8"
+                />
+              }>
                 {data.list.map((sp) => {
                   const open = expandedSpells.has(sp.name);
                   return (
@@ -879,7 +965,7 @@ export default function CharacterSheet() {
                         </div>
                         <span style={{ color: "#7a6a56", fontSize: 10 }}>{open ? "▲" : "▼"}</span>
                       </div>
-                      <div style={{ color: "#9a8060", fontSize: 12, marginTop: 2 }}>{sp.desc}</div>
+                      <div style={{ color: "#9a8060", fontSize: 12, marginTop: 2 }}>{resolveSpellText(sp.desc)}</div>
                       {open && (
                         <div style={{
                           marginTop: 10, padding: "10px 12px",
@@ -888,7 +974,7 @@ export default function CharacterSheet() {
                           whiteSpace: "pre-line",
                           borderTop: "1px solid rgba(139,28,28,0.2)",
                         }}>
-                          {sp.fullDesc}
+                          {resolveSpellText(sp.fullDesc)}
                         </div>
                       )}
                     </div>
@@ -1020,12 +1106,6 @@ export default function CharacterSheet() {
                   ))}
                 </div>
                 <span style={{ fontFamily: "'Fira Code', monospace", fontSize: 14, color: "#e8dcc4", minWidth: 24, textAlign: "center" }}>{bloodCurseUses}/{CHAR.profBonus}</span>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setBloodCurseUses(CHAR.profBonus); }}
-                  style={{ background: "rgba(139,28,28,0.2)", border: "1px solid rgba(139,28,28,0.4)", color: "#c4b49a", fontFamily: "'Cinzel', serif", fontSize: 9, letterSpacing: 1, textTransform: "uppercase", padding: "3px 8px", borderRadius: 2, cursor: "pointer" }}
-                >
-                  Long Rest
-                </button>
               </div>
               {CHAR.features.filter(f => f.name.startsWith("Blood Curse")).map((f) => {
                 const open = expandedFeatures.has(f.name);
