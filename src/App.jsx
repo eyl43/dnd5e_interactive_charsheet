@@ -8,6 +8,11 @@ const MUTAGEN_EFFECTS = {
   Reconstruction: { speed: -10 },
 };
 
+// Magic item stat effects: "set" raises the score to value (no effect if already >= value), "add" stacks additively
+const MAGIC_ITEM_EFFECTS = {
+  "Amulet of Health": { CON: { type: "set", value: 19 } },
+};
+
 const CHAR = {
   name: "Dr. Lucien Harrow",
   race: "Custom Lineage",
@@ -16,7 +21,7 @@ const CHAR = {
   background: "Sage",
   alignment: "Chaotic Good",
   profBonus: 4,
-  hp: { max: 75, current: 75, temp: 0 },
+  hp: { max: 75, baseHpFromDice: 51, current: 75, temp: 0 },
   hitDice: "7d8 + 5d6",
   hemocraftDie: "1d6",
   speed: 30,
@@ -202,6 +207,14 @@ const CHAR = {
     "Explorer's Pack",
     "Alchemist's Supplies",
   ],
+  magicItems: [
+    {
+      name: "Amulet of Health",
+      rarity: "Uncommon",
+      attunement: true,
+      desc: "Your Constitution score is 19 while you wear this amulet. It has no effect if your Constitution is already 19 or higher.",
+    },
+  ],
   consumables: [
     { name: "Potion of Healing, Greater (x2)",  rarity: "Uncommon", desc: "Heal 4d4+4 HP" },
     { name: "Dust of Disappearance",            rarity: "Uncommon", desc: "Invisibility for 2d4 min, 10ft radius, no concentration" },
@@ -333,6 +346,7 @@ const MAX_MUTAGENS = 2; // Strange Metabolism
 
 export default function CharacterSheet() {
   const [activeMutagens, setActiveMutagens] = useState(new Set(["Celerity", "Sagacity"]));
+  const [activeItems, setActiveItems] = useState(new Set());
   const [bladesongActive, setBladesongActive] = useState(false);
   const [tattooMaulActive, setTattooMaulActive] = useState(false);
   const [shieldActive, setShieldActive] = useState(false);
@@ -378,6 +392,14 @@ export default function CharacterSheet() {
     });
   };
 
+  const toggleItem = (name) => {
+    setActiveItems(prev => {
+      const next = new Set(prev);
+      next.has(name) ? next.delete(name) : next.add(name);
+      return next;
+    });
+  };
+
   const toggleSpell   = (n) => setExpandedSpells(prev => { const s = new Set(prev); s.has(n) ? s.delete(n) : s.add(n); return s; });
   const toggleFeature = (n) => setExpandedFeatures(prev => { const s = new Set(prev); s.has(n) ? s.delete(n) : s.add(n); return s; });
 
@@ -387,7 +409,16 @@ export default function CharacterSheet() {
   const getSpeedBonus = () =>
     [...activeMutagens].reduce((sum, n) => sum + (MUTAGEN_EFFECTS[n]?.speed ?? 0), 0);
 
-  const getEffectiveBase = (stat) => CHAR.stats[stat].base + getMutStatBonus(stat);
+  const getEffectiveBase = (stat) => {
+    let score = CHAR.stats[stat].base + getMutStatBonus(stat);
+    for (const itemName of activeItems) {
+      const effect = MAGIC_ITEM_EFFECTS[itemName]?.[stat];
+      if (!effect) continue;
+      if (effect.type === "set") score = Math.max(score, effect.value);
+      else if (effect.type === "add") score += effect.value;
+    }
+    return score;
+  };
   const getEffectiveMod  = (stat) => Math.floor((getEffectiveBase(stat) - 10) / 2);
   const getEffectiveSave = (stat) => {
     const mod = getEffectiveMod(stat);
@@ -399,7 +430,8 @@ export default function CharacterSheet() {
   const intMod   = getEffectiveMod("INT");
   const baseSpeed = CHAR.speed + getSpeedBonus();
 
-  const hpPercent = Math.max(0, Math.min(100, (currentHp / CHAR.hp.max) * 100));
+  const effectiveMaxHp = CHAR.hp.baseHpFromDice + getEffectiveMod("CON") * CHAR.level;
+  const hpPercent = Math.max(0, Math.min(100, (currentHp / effectiveMaxHp) * 100));
   const hpColor   = hpPercent > 75 ? "#4a9e6e" : hpPercent > 50 ? "#c4a030" : hpPercent > 25 ? "#c45c3e" : "#8b1c1c";
 
   const acBase          = 12 + dexMod + (bladesongActive ? intMod : 0);
@@ -599,7 +631,7 @@ export default function CharacterSheet() {
             const effBase  = getEffectiveBase(statName);
             const effMod   = getEffectiveMod(statName);
             const effSave  = getEffectiveSave(statName);
-            const changed  = getMutStatBonus(statName) !== 0;
+            const changed  = getMutStatBonus(statName) !== 0 || [...activeItems].some(n => MAGIC_ITEM_EFFECTS[n]?.[statName]);
             return (
               <StatBlock
                 key={statName}
@@ -635,8 +667,8 @@ export default function CharacterSheet() {
                 type="number"
                 value={currentHp}
                 min={0}
-                max={CHAR.hp.max}
-                onChange={(e) => setCurrentHp(Math.max(0, Math.min(CHAR.hp.max, Number(e.target.value) || 0)))}
+                max={effectiveMaxHp}
+                onChange={(e) => setCurrentHp(Math.max(0, Math.min(effectiveMaxHp, Number(e.target.value) || 0)))}
                 style={{
                   width: 56, textAlign: "center",
                   background: "rgba(10,8,6,0.8)",
@@ -646,7 +678,7 @@ export default function CharacterSheet() {
                   padding: "2px 4px", outline: "none",
                 }}
               />
-              <span style={{ color: "#7a6a56", fontSize: 15, fontFamily: "'Fira Code', monospace" }}>/ {CHAR.hp.max}</span>
+              <span style={{ color: "#7a6a56", fontSize: 15, fontFamily: "'Fira Code', monospace" }}>/ {effectiveMaxHp}</span>
             </div>
             {/* Temp HP */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, borderLeft: "1px solid rgba(139,28,28,0.2)", paddingLeft: 20 }}>
@@ -1140,6 +1172,53 @@ export default function CharacterSheet() {
         {/* GEAR TAB */}
         {tab === "gear" && (
           <div>
+            <Section title="Magic Items" accent="rgba(120,80,200,0.6)">
+              <div style={{ display: "grid", gap: 8 }}>
+                {CHAR.magicItems.map((item) => {
+                  const isActive = activeItems.has(item.name);
+                  return (
+                    <div key={item.name} style={{
+                      padding: "10px 14px",
+                      background: isActive ? "rgba(120,80,200,0.12)" : "rgba(20,16,14,0.3)",
+                      border: `1px solid ${isActive ? "rgba(160,120,240,0.5)" : "rgba(120,80,200,0.2)"}`,
+                      borderRadius: 3, transition: "all 0.25s ease",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                        <span style={{ fontFamily: "'Cinzel', serif", color: isActive ? "#c8a8ff" : "#e8dcc4", fontSize: 13, flex: 1 }}>{item.name}</span>
+                        <Tag color={isActive ? "rgba(120,80,200,0.4)" : "rgba(80,60,120,0.35)"}>{item.rarity}</Tag>
+                        {item.attunement && <Tag color="rgba(100,60,30,0.4)">Attunement</Tag>}
+                        <button
+                          onClick={() => toggleItem(item.name)}
+                          style={{
+                            padding: "3px 12px", fontSize: 10, letterSpacing: 2,
+                            fontFamily: "'Cinzel', serif", textTransform: "uppercase",
+                            background: isActive ? "rgba(120,80,200,0.35)" : "rgba(20,16,14,0.5)",
+                            border: `1px solid ${isActive ? "rgba(160,120,240,0.7)" : "rgba(120,80,200,0.3)"}`,
+                            color: isActive ? "#d8b8ff" : "#9a8060",
+                            borderRadius: 2, cursor: "pointer", transition: "all 0.2s",
+                          }}
+                        >{isActive ? "Attuned ✦" : "Attune"}</button>
+                      </div>
+                      <div style={{ fontSize: 12, color: "#9a8060", marginTop: 4, fontStyle: "italic" }}>{item.desc}</div>
+                      {isActive && (
+                        <div style={{ marginTop: 6, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          {Object.entries(MAGIC_ITEM_EFFECTS[item.name] ?? {}).map(([stat, effect]) => (
+                            <span key={stat} style={{
+                              fontSize: 10, fontFamily: "'Fira Code', monospace",
+                              color: "#c8a8ff", background: "rgba(120,80,200,0.15)",
+                              border: "1px solid rgba(160,120,240,0.3)", padding: "1px 7px", borderRadius: 2,
+                            }}>
+                              {stat} {effect.type === "set" ? `→ ${effect.value}` : `+${effect.value}`}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </Section>
+
             <Section title="Equipment">
               <div style={{ display: "grid", gap: 3 }}>
                 {CHAR.equipment.map((item, i) => (
