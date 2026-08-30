@@ -1,4 +1,12 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { CONDITIONS, EXHAUSTION_LEVELS, INCAPACITATING } from "./conditions.js";
+import {
+  clearSheet,
+  importSheet,
+  useDownloadSheet,
+  useLastSaved,
+  usePersistentState,
+} from "./persistence.js";
 
 // Stat/speed deltas applied per active mutagen
 const MUTAGEN_EFFECTS = {
@@ -21,7 +29,9 @@ const CHAR = {
   background: "Sage",
   alignment: "Chaotic Good",
   profBonus: 4,
-  hp: { max: 75, baseHpFromDice: 51, current: 75, temp: 0 },
+  // Max HP is derived (baseHpFromDice + CON mod x level), so it tracks the Amulet of
+  // Health and any mutagens. 99 assumes the amulet is attuned, which is the default.
+  hp: { max: 99, baseHpFromDice: 51, current: 99, temp: 0 },
   hitDice: "7d8 + 5d6",
   hemocraftDie: "1d6",
   speed: 30,
@@ -225,7 +235,7 @@ const CHAR = {
 
 const formatMod = (n) => (n >= 0 ? `+${n}` : `${n}`);
 
-function StatBlock({ name, effectiveBase, effectiveMod, effectiveSave, saveProficient, changed }) {
+function StatBlock({ name, effectiveBase, effectiveMod, effectiveSave, saveProficient, changed, saveAdvantage }) {
   return (
     <div style={{
       display: "flex", flexDirection: "column", alignItems: "center",
@@ -242,6 +252,12 @@ function StatBlock({ name, effectiveBase, effectiveMod, effectiveSave, saveProfi
       <div style={{ marginTop: 6, fontSize: 11, color: saveProficient ? "#d4a82a" : "#9a8060", letterSpacing: 1, textTransform: "uppercase" }}>
         Save {formatMod(effectiveSave)}{saveProficient ? " ★" : ""}
       </div>
+      {saveAdvantage && (
+        <div title="Haste: advantage on DEX saving throws"
+             style={{ marginTop: 2, fontSize: 9, letterSpacing: 1, color: "#ffd08a", fontFamily: "'Fira Code', monospace" }}>
+          ADV ⏵⏵
+        </div>
+      )}
     </div>
   );
 }
@@ -342,27 +358,102 @@ function ConcBadge() {
   );
 }
 
+// Arcane seal that heads the sheet - two counter-rotating rings around a blood drop.
+function Sigil({ size = 64, active }) {
+  const ink = active ? "#c45c3e" : "#8b1c1c";
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true" style={{ display: "block" }}>
+      <circle cx="32" cy="32" r="30" fill="none" stroke={ink} strokeWidth="1" opacity="0.5" />
+      <g className="cs-sigil-ring">
+        <circle cx="32" cy="32" r="26" fill="none" stroke="#d4a82a" strokeWidth="0.75"
+                strokeDasharray="2 6" opacity="0.75" />
+        <path d="M32 6 L54 45 L10 45 Z" fill="none" stroke={ink} strokeWidth="0.75" opacity="0.45" />
+      </g>
+      <g className="cs-sigil-ring cs-sigil-ring--reverse">
+        <path d="M32 58 L10 19 L54 19 Z" fill="none" stroke="#d4a82a" strokeWidth="0.75" opacity="0.35" />
+      </g>
+      <g className="cs-sigil-drop">
+        <path d="M32 17 C32 17 44 32 44 40 A12 12 0 0 1 20 40 C20 32 32 17 32 17 Z" fill={ink} opacity="0.9" />
+        <path d="M32 25 C32 25 39 34 39 39.5 A7 7 0 0 1 25 39.5 C25 34 32 25 32 25 Z"
+              fill="#c45c3e" opacity="0.65" />
+        <path d="M32 31 v13 M27.5 36 h9" stroke="#e8dcc4" strokeWidth="1.6" strokeLinecap="round" opacity="0.85" />
+      </g>
+    </svg>
+  );
+}
+
+function ConditionChip({ condition, active, immune, onToggle }) {
+  const title = immune
+    ? `Immune (${immune}) - ${condition.desc}`
+    : condition.desc;
+  return (
+    <button
+      type="button"
+      className={`cs-chip${active ? " cs-chip--on" : ""}`}
+      onClick={immune ? undefined : onToggle}
+      disabled={Boolean(immune)}
+      title={title}
+      aria-pressed={active}
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 6,
+        fontFamily: "'Cinzel', serif", fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase",
+        padding: "5px 11px", borderRadius: 2,
+        background: active ? "linear-gradient(180deg, rgba(139,28,28,0.5), rgba(139,28,28,0.2))" : "rgba(20,16,14,0.45)",
+        border: `1px solid ${active ? "#8b1c1c" : immune ? "rgba(60,160,60,0.3)" : "#3a2e24"}`,
+        color: active ? "#e8dcc4" : immune ? "rgba(128,200,128,0.55)" : "#9a8060",
+        textDecoration: immune ? "line-through" : "none",
+        cursor: immune ? "not-allowed" : "pointer",
+        opacity: immune ? 0.6 : 1,
+      }}
+    >
+      <span style={{ fontSize: 12, lineHeight: 1, color: active ? "#d4a82a" : "inherit" }}>{condition.glyph}</span>
+      {condition.name}
+    </button>
+  );
+}
+
+// Absolute clock time rather than "2m ago" - a relative label would go stale between renders.
+const formatSaveTime = (ms) =>
+  new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+const ioButtonStyle = {
+  background: "transparent", border: "1px solid rgba(139,105,20,0.3)",
+  color: "#7a6a56", fontFamily: "'Cinzel', serif", fontSize: 9, letterSpacing: 2,
+  textTransform: "uppercase", padding: "3px 10px", borderRadius: 2,
+};
+
 const MAX_MUTAGENS = 2; // Strange Metabolism
+const BLOOD_MALEDICT_USES = 2; // 2 per short rest
 
 export default function CharacterSheet() {
-  const [activeMutagens, setActiveMutagens] = useState(new Set(["Celerity", "Sagacity"]));
-  const [activeItems, setActiveItems] = useState(new Set());
-  const [bladesongActive, setBladesongActive] = useState(false);
-  const [tattooMaulActive, setTattooMaulActive] = useState(false);
-  const [shieldActive, setShieldActive] = useState(false);
-  const [bulletCount, setBulletCount] = useState(0);
-  const [bloodCurseUses, setBloodCurseUses] = useState(CHAR.profBonus);
+  // Anything that survives a closed tab uses usePersistentState (localStorage).
+  // Purely visual state - which tab is open, which cards are expanded - stays in useState.
+  const [activeMutagens, setActiveMutagens] = usePersistentState("mutagens", new Set(["Celerity", "Sagacity"]));
+  const [activeItems, setActiveItems] = usePersistentState("attunedItems", new Set(["Amulet of Health"]));
+  const [bladesongActive, setBladesongActive] = usePersistentState("bladesongActive", false);
+  const [tattooMaulActive, setTattooMaulActive] = usePersistentState("tattooMaulActive", false);
+  const [shieldActive, setShieldActive] = usePersistentState("shieldActive", false);
+  const [hasteActive, setHasteActive] = usePersistentState("hasteActive", false);
+  const [bulletCount, setBulletCount] = usePersistentState("bullets", 0);
+  const [bloodCurseUses, setBloodCurseUses] = usePersistentState("bloodCurseUses", BLOOD_MALEDICT_USES);
   const [expandedSpells, setExpandedSpells] = useState(new Set());
   const [expandedFeatures, setExpandedFeatures] = useState(new Set());
-  const [currentHp, setCurrentHp] = useState(CHAR.hp.current);
-  const [tempHp, setTempHp] = useState(CHAR.hp.temp);
+  const [currentHp, setCurrentHp] = usePersistentState("currentHp", CHAR.hp.current);
+  const [tempHp, setTempHp] = usePersistentState("tempHp", CHAR.hp.temp);
+  const [conditions, setConditions] = usePersistentState("conditions", new Set());
+  const [exhaustion, setExhaustion] = usePersistentState("exhaustion", 0);
+  const [concentration, setConcentration] = usePersistentState("concentration", { active: false, spell: "" });
+  const [deathSaves, setDeathSaves] = usePersistentState("deathSaves", { successes: 0, failures: 0 });
+  const [hitDice, setHitDice] = usePersistentState("hitDice", { d8: 7, d6: 5 });
+  const [arcaneRecoveryUsed, setArcaneRecoveryUsed] = usePersistentState("arcaneRecoveryUsed", false);
   const [tab, setTab] = useState("combat");
-  const [spellSlots, setSpellSlots] = useState(
+  const [spellSlots, setSpellSlots] = usePersistentState(
+    "spellSlots",
     Object.fromEntries(Object.entries(CHAR.spells).map(([lvl, d]) => [lvl, d.slots]))
   );
-  const [bladesongUsesLeft, setBladesongUsesLeft] = useState(4);
-  const [mutageNDoses, setMutageNDoses] = useState(4);
-  const [lore, setLore] = useState({
+  const [bladesongUsesLeft, setBladesongUsesLeft] = usePersistentState("bladesongUses", 4);
+  const [mutageNDoses, setMutageNDoses] = usePersistentState("mutagenDoses", 4);
+  const [lore, setLore] = usePersistentState("lore", {
     history: "Dr. Lucien Harrow had, for most of his life, known that he was the prime example for why certain rules and regulations were written. However, his widespread research success and influence on politics and academic funding encouraged officials and deans alike to turn a blind eye to blatant violations of safety and code of conduct. Currently at the height of his career, he holds a senior position at the Thalmurian Institute of Magic, where he is renowned for breakthroughs in applied arcanotech, battlefield thaumaturgy, and most recently amplified moonglow. His patents single handedly funded great portions of the city watch and private consortium research. His grants filled university coffers, encouraging academic tourism from across the continent.  His famously dry, unenthusiastic lectures on inventions of generational importance packed auditoriums and encouraged the construction of two separate expansions for standing-room only attendees. Although scholars who attended were often left confused as to whether they had been instructed or insulted, all were eager to return for greater insight into the professor’s work. The university, as a result, had no choice but to turn a blind eye to what board members found to be distasteful, ethically indefensible, yet incredibly profitable methods. Harrow’s reputation as the premier Thalmurian tracker was stranger still. Inside the city, he was also considered the foremost living authority on pursuit of beasts, fugitives, the occult, and, more often than not, people. He possessed an unnerving intelligence and a talent for deduction. Many of his coworkers often admitted that conversations with Harrow often felt more like dissections. When the noble houses or city government wanted problems solved without a public spectacle, Harrow was the man for the job. He always accepted, as long as the suspect could be ‘harvested’ for research. The city constables often ignored missing organs from the deceased. Harrow’s graduate students knew him as a tyrant of perfection.He was wholly uninterested in morale, and was well known for graduating only 10% of the students who entered his lab.Nobody ever left his tutelage completely intact, in either the physical, magical, or mental sense.Public morality was a cute theater for the professor, and political office to be elaborate mechanisms of control for which there were far more direct solutions.Yet despite his unyielding personality, many were still hungry for every word that the professor would offer.Perhaps he only considered his peers, which there were precious few, to be worth his time and consideration. Very little is known about Harrow’s formative years before the university.It is known that he began as a graduate student at the Thalmurian Institute directly after serving as an imperial architecti in the first Thalmurian- Mageocracy conflict.However, the history books are crystal clear about the accounts of widespread cruelty inflicted by the Mageocracy on and off the battlefield.Rumors mention that Harrow perfected his hemocracy here on the blood - rich battlefields.It is one of the few research discoveries that he has kept to himself.His success in the university and field have made him a legendary fighter.Despite his contempt for hubris, some of his graduate students have whispered that Harrow proudly displays a clipping of the bounty the Mageocracy has placed on his head.But it seems he feels no pride in his talents. *When something flees beneath the ground, they call the doctor when they want it found.*",
     personality:  "Laconic, pessimistic, 'nam level boomer' vibe",
     ideals:       "To protect Thalmuria at all costs",
@@ -370,6 +461,35 @@ export default function CharacterSheet() {
     flaws:        "Many",
     notes:        "",
   });
+
+  // Transient UI state - deliberately not saved.
+  const [hpDelta, setHpDelta] = useState("");
+  const [concPrompt, setConcPrompt] = useState(null); // DC of a pending concentration save
+  const [lethargy, setLethargy] = useState(false);    // Haste just ended, reminder to show
+  const [ioError, setIoError] = useState("");
+  const fileInputRef = useRef(null);
+  const lastSaved = useLastSaved();
+  const downloadSheet = useDownloadSheet(CHAR.name);
+
+  const handleImportFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = ""; // let the same file be picked again after a failure
+    if (!file) return;
+    try {
+      importSheet(JSON.parse(await file.text()));
+      window.location.reload(); // simplest way to rehydrate every tracker at once
+    } catch (err) {
+      setIoError(err instanceof SyntaxError ? "That file isn't valid JSON." : err.message);
+    }
+  };
+
+  const openImportPicker = () => fileInputRef.current?.click();
+
+  const handleResetSheet = () => {
+    if (!window.confirm("Wipe all saved progress and return the sheet to its starting state?")) return;
+    clearSheet();
+    window.location.reload();
+  };
 
   const tabs = [
     { id: "combat",   label: "Combat"   },
@@ -430,18 +550,135 @@ export default function CharacterSheet() {
   const intMod   = getEffectiveMod("INT");
   const baseSpeed = CHAR.speed + getSpeedBonus();
 
-  const effectiveMaxHp = CHAR.hp.baseHpFromDice + getEffectiveMod("CON") * CHAR.level;
+  const rawMaxHp = CHAR.hp.baseHpFromDice + getEffectiveMod("CON") * CHAR.level;
+  // Exhaustion 4 halves your hit point maximum, 2 halves speed, 5 drops speed to 0.
+  const maxHpAt = (exhaustionLevel) => (exhaustionLevel >= 4 ? Math.floor(rawMaxHp / 2) : rawMaxHp);
+  const effectiveMaxHp = maxHpAt(exhaustion);
   const hpPercent = Math.max(0, Math.min(100, (currentHp / effectiveMaxHp) * 100));
+  const tempPercent = Math.max(0, Math.min(100 - hpPercent, (tempHp / effectiveMaxHp) * 100));
   const hpColor   = hpPercent > 75 ? "#4a9e6e" : hpPercent > 50 ? "#c4a030" : hpPercent > 25 ? "#c45c3e" : "#8b1c1c";
+  const isDown    = currentHp <= 0;
 
-  const acBase          = 12 + dexMod + (bladesongActive ? intMod : 0);
+  // ── Conditions ───────────────────────────────────────────────────────────
+  const toggleCondition = (name) =>
+    setConditions(prev => {
+      const next = new Set(prev);
+      next.has(name) ? next.delete(name) : next.add(name);
+      return next;
+    });
+  const incapacitated = [...conditions].some(c => INCAPACITATING.has(c));
+
+  const bloodCurseRemaining = Math.min(bloodCurseUses, BLOOD_MALEDICT_USES);
+
+  // Max HP moves when attunement, mutagens, or exhaustion change. Current HP follows it down.
+  useEffect(() => {
+    if (currentHp > effectiveMaxHp) setCurrentHp(effectiveMaxHp);
+  }, [currentHp, effectiveMaxHp, setCurrentHp]);
+
+  const acBase          = 12 + dexMod + (bladesongActive ? intMod : 0) + (hasteActive ? 2 : 0);
   const acEffective     = acBase + (shieldActive ? 5 : 0);
-  const acDisplay       = shieldActive ? `${acEffective} ⛨` : `${acEffective}`;
+  const acDisplay       = `${acEffective}${shieldActive ? " ⛨" : ""}${hasteActive ? " ⏵⏵" : ""}`;
   const spellAtkDisplay = formatMod(intMod + CHAR.profBonus);
   const dcDisplay    = 8 + CHAR.profBonus + intMod;
+  // Haste doubles your speed, so it applies after the Bladesong bonus but before exhaustion.
   const initDisplay  = formatMod(dexMod);
-  const effectiveSpeed = bladesongActive ? baseSpeed + 10 : baseSpeed;
-  const speedDisplay = bladesongActive ? `${effectiveSpeed} ft ♪` : `${effectiveSpeed} ft`;
+  const songSpeed      = bladesongActive ? baseSpeed + 10 : baseSpeed;
+  const hastedSpeed    = hasteActive ? songSpeed * 2 : songSpeed;
+  const effectiveSpeed = exhaustion >= 5 ? 0 : exhaustion >= 2 ? Math.floor(hastedSpeed / 2) : hastedSpeed;
+  const speedDisplay   = `${effectiveSpeed} ft${bladesongActive ? " ♪" : ""}${hasteActive ? " ⏵⏵" : ""}`;
+  // Haste grants advantage on DEX saves.
+  const dexSaveAdvantage = hasteActive;
+  // Bladesong adds INT to concentration saves; the base is a plain CON save.
+  const concSaveBonus  = getEffectiveSave("CON") + (bladesongActive ? intMod : 0);
+
+  // ── Health ───────────────────────────────────────────────────────────────
+  const applyDamage = (amount) => {
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    const absorbed = Math.min(tempHp, amount); // temp HP always takes the hit first
+    if (absorbed > 0) setTempHp(tempHp - absorbed);
+    const throughToHp = amount - absorbed;
+    if (throughToHp > 0) setCurrentHp(Math.max(0, currentHp - throughToHp));
+    if (concentration.active) setConcPrompt(Math.max(10, Math.floor(amount / 2)));
+  };
+
+  const applyHeal = (amount) => {
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    setCurrentHp(Math.min(effectiveMaxHp, Math.max(0, currentHp) + amount));
+    setDeathSaves({ successes: 0, failures: 0 }); // back on your feet, saves reset
+  };
+
+  const submitHpDelta = (mode) => {
+    const amount = Math.abs(Number(hpDelta));
+    if (!amount) return;
+    mode === "damage" ? applyDamage(amount) : applyHeal(amount);
+    setHpDelta("");
+  };
+
+  // ── Rests ────────────────────────────────────────────────────────────────
+  const fullSlots = () =>
+    Object.fromEntries(Object.entries(CHAR.spells).map(([lvl, d]) => [lvl, d.slots]));
+
+  // Haste is a concentration spell, so the two are wired together: casting it takes
+  // your concentration, and losing concentration drops it (with the lethargy that follows).
+  const endHaste = (lethargic) => {
+    setHasteActive(false);
+    setLethargy(Boolean(lethargic));
+  };
+
+  const dropConcentration = () => {
+    setConcentration({ active: false, spell: "" });
+    setConcPrompt(null);
+    if (hasteActive) endHaste(true);
+  };
+
+  const toggleHaste = () => {
+    if (hasteActive) {
+      endHaste(true);
+      if (concentration.spell === "Haste") {
+        setConcentration({ active: false, spell: "" });
+        setConcPrompt(null);
+      }
+      return;
+    }
+    setHasteActive(true);
+    setLethargy(false);
+    setConcentration({ active: true, spell: "Haste" });
+  };
+
+  const shortRest = () => {
+    setBladesongActive(false);
+    setShieldActive(false);
+    setBloodCurseUses(BLOOD_MALEDICT_USES); // Blood Maledict: 2 per short rest
+    dropConcentration();
+    setLethargy(false); // a rest is not the spell ending mid-fight
+  };
+
+  const longRest = () => {
+    // 5e: regain hit dice equal to half your level, your choice of which. Bigger dice first.
+    const diceBack = Math.max(1, Math.floor(CHAR.level / 2));
+    const d8Back = Math.min(7 - hitDice.d8, diceBack);
+    const d6Back = Math.min(5 - hitDice.d6, diceBack - d8Back);
+    setHitDice({ d8: hitDice.d8 + d8Back, d6: hitDice.d6 + d6Back });
+
+    setSpellSlots(fullSlots());
+    setBladesongUsesLeft(4);
+    setMutageNDoses(4);
+    setBloodCurseUses(BLOOD_MALEDICT_USES);
+    setArcaneRecoveryUsed(false);
+
+    const restedExhaustion = Math.max(0, exhaustion - 1);
+    setExhaustion(restedExhaustion);
+    setCurrentHp(maxHpAt(restedExhaustion));
+    setTempHp(0);
+    setDeathSaves({ successes: 0, failures: 0 });
+    setConditions(new Set());
+
+    setBladesongActive(false);
+    setShieldActive(false);
+    setTattooMaulActive(false);
+    dropConcentration();
+    setLethargy(false);
+  };
 
   const resolveSpellText = (text) => {
     if (!text) return text;
@@ -460,8 +697,6 @@ export default function CharacterSheet() {
       color: "#c4b49a", minHeight: "100vh", padding: 0, margin: 0,
       position: "relative", overflow: "hidden",
     }}>
-      <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Fira+Code:wght@300;400&display=swap" rel="stylesheet" />
-
       <div style={{
         position: "fixed", top: 0, left: 0, right: 0, bottom: 0, pointerEvents: "none", zIndex: 0,
         background: "radial-gradient(ellipse at 20% 20%, rgba(139,28,28,0.08) 0%, transparent 60%), radial-gradient(ellipse at 80% 80%, rgba(139,105,20,0.05) 0%, transparent 50%)",
@@ -471,6 +706,9 @@ export default function CharacterSheet() {
 
         {/* Header */}
         <div style={{ textAlign: "center", marginBottom: 24, padding: "20px 0" }}>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+            <Sigil size={72} active={bladesongActive} />
+          </div>
           <div style={{ fontSize: 9, letterSpacing: 6, color: "#8b1c1c", textTransform: "uppercase", fontFamily: "'Cinzel', serif", marginBottom: 8 }}>
             Blood Hunter Mutant 7 · Bladesinger Wizard 5
           </div>
@@ -485,22 +723,59 @@ export default function CharacterSheet() {
             Custom Lineage · Level 12 · Feat: Gunner
           </div>
           <div style={{ width: 60, height: 1, background: "linear-gradient(90deg, transparent, #8b1c1c, transparent)", margin: "16px auto 0" }} />
-          <button
-            onClick={() => {
-              setSpellSlots(Object.fromEntries(Object.entries(CHAR.spells).map(([lvl, d]) => [lvl, d.slots])));
-              setBladesongUsesLeft(4);
-              setMutageNDoses(4);
-              setBloodCurseUses(CHAR.profBonus);
-            }}
-            style={{
-              marginTop: 14, background: "rgba(139,28,28,0.15)", border: "1px solid rgba(139,28,28,0.45)",
-              color: "#c4b49a", fontFamily: "'Cinzel', serif", fontSize: 10, letterSpacing: 3,
-              textTransform: "uppercase", padding: "6px 20px", borderRadius: 2, cursor: "pointer",
-              transition: "all 0.2s",
-            }}
-            onMouseEnter={(e) => { e.target.style.background = "rgba(139,28,28,0.3)"; e.target.style.color = "#e8dcc4"; }}
-            onMouseLeave={(e) => { e.target.style.background = "rgba(139,28,28,0.15)"; e.target.style.color = "#c4b49a"; }}
-          >⚭ Long Rest</button>
+          <div className="cs-no-print" style={{ marginTop: 14, display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+            <button
+              className="cs-btn"
+              onClick={shortRest}
+              title="Ends Bladesong, Shield, and concentration. Spend hit dice from the health panel."
+              style={{
+                background: "rgba(30,25,20,0.6)", border: "1px solid rgba(139,105,20,0.4)",
+                color: "#c4b49a", fontFamily: "'Cinzel', serif", fontSize: 10, letterSpacing: 3,
+                textTransform: "uppercase", padding: "6px 20px", borderRadius: 2,
+              }}
+            >☾ Short Rest</button>
+            <button
+              className="cs-btn"
+              onClick={longRest}
+              title="Full HP, all resources restored, conditions cleared, one level of exhaustion removed."
+              style={{
+                background: "rgba(139,28,28,0.15)", border: "1px solid rgba(139,28,28,0.45)",
+                color: "#c4b49a", fontFamily: "'Cinzel', serif", fontSize: 10, letterSpacing: 3,
+                textTransform: "uppercase", padding: "6px 20px", borderRadius: 2,
+              }}
+            >⚭ Long Rest</button>
+          </div>
+
+          {/* Save status + sheet import/export */}
+          <div className="cs-no-print" style={{
+            marginTop: 14, display: "flex", gap: 10, justifyContent: "center",
+            alignItems: "center", flexWrap: "wrap",
+          }}>
+            <span style={{ fontFamily: "'Fira Code', monospace", fontSize: 10, color: lastSaved ? "#5f8a6a" : "#7a6a56" }}>
+              {lastSaved ? `◈ Saved ${formatSaveTime(lastSaved)}` : "◈ Auto-saves to this browser"}
+            </span>
+            <button className="cs-btn" onClick={downloadSheet} title="Download the sheet as a JSON backup" style={ioButtonStyle}>
+              Export
+            </button>
+            <button className="cs-btn" onClick={openImportPicker} title="Restore from a JSON backup" style={ioButtonStyle}>
+              Import
+            </button>
+            <button className="cs-btn" onClick={handleResetSheet} title="Wipe all saved progress" style={ioButtonStyle}>
+              Reset
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json,.json"
+              onChange={handleImportFile}
+              style={{ display: "none" }}
+            />
+          </div>
+          {ioError && (
+            <div style={{ marginTop: 8, fontSize: 11, color: "#c45c3e", fontFamily: "'Fira Code', monospace" }}>
+              {ioError}
+            </div>
+          )}
         </div>
 
         {/* Mutagen Toggles */}
@@ -517,7 +792,9 @@ export default function CharacterSheet() {
               return (
                 <button
                   key={m.name}
+                  className="cs-btn"
                   onClick={() => toggleMutagen(m.name)}
+                  disabled={isFull}
                   title={isFull ? "Strange Metabolism: max 2 mutagens active" : `${m.benefit} / ${m.drawback}`}
                   style={{
                     background: isActive
@@ -540,8 +817,9 @@ export default function CharacterSheet() {
         </div>
 
         {/* Active Ability Toggles */}
-        <div style={{ marginBottom: 20, display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+        <div className="cs-toggles" style={{ marginBottom: 20, display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
           <button
+            className="cs-btn"
             onClick={() => setBladesongActive(prev => !prev)}
             style={{
               background: bladesongActive
@@ -565,6 +843,7 @@ export default function CharacterSheet() {
             )}
           </button>
           <button
+            className="cs-btn"
             onClick={() => setTattooMaulActive(prev => !prev)}
             style={{
               background: tattooMaulActive
@@ -588,6 +867,32 @@ export default function CharacterSheet() {
             )}
           </button>
           <button
+            className="cs-btn"
+            onClick={toggleHaste}
+            title="Haste: doubles speed, +2 AC, advantage on DEX saves, one extra limited action. Concentration, 1 minute."
+            style={{
+              background: hasteActive
+                ? "linear-gradient(180deg, rgba(200,140,40,0.45), rgba(140,80,10,0.25))"
+                : "rgba(30,25,20,0.6)",
+              border: `1px solid ${hasteActive ? "rgba(255,180,70,0.7)" : "#44362a"}`,
+              color: hasteActive ? "#ffd08a" : "#9a8060",
+              fontFamily: "'Cinzel', serif", fontSize: 10, letterSpacing: 2,
+              textTransform: "uppercase", padding: "7px 20px", borderRadius: 2,
+              cursor: "pointer", transition: "all 0.25s ease",
+              boxShadow: hasteActive
+                ? "0 0 20px rgba(255,170,60,0.28), inset 0 0 16px rgba(255,170,60,0.1)"
+                : "none",
+            }}
+          >
+            {hasteActive ? "⏵⏵" : "⏸"} Haste {hasteActive ? "Active" : "Inactive"}
+            {hasteActive && (
+              <span style={{ color: "rgba(255,200,130,0.75)", fontSize: 9, marginLeft: 10 }}>
+                {effectiveSpeed} ft · +2 AC · adv. DEX saves · +1 action
+              </span>
+            )}
+          </button>
+          <button
+            className="cs-btn"
             onClick={() => setShieldActive(prev => !prev)}
             style={{
               background: shieldActive
@@ -626,7 +931,7 @@ export default function CharacterSheet() {
         </div>
 
         {/* Stat Blocks */}
-        <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 24 }}>
+        <div className="cs-stats" style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 24 }}>
           {Object.entries(CHAR.stats).map(([statName, data]) => {
             const effBase  = getEffectiveBase(statName);
             const effMod   = getEffectiveMod(statName);
@@ -641,29 +946,33 @@ export default function CharacterSheet() {
                 effectiveSave={effSave}
                 saveProficient={data.prof}
                 changed={changed}
+                saveAdvantage={statName === "DEX" && dexSaveAdvantage}
               />
             );
           })}
         </div>
 
         {/* HP Panel */}
-        <div style={{ marginBottom: 20, padding: "14px 16px", background: "rgba(20,16,14,0.5)", border: "1px solid rgba(139,28,28,0.2)", borderRadius: 3 }}>
-          {/* Health bar */}
-          <div style={{ height: 8, background: "rgba(10,8,6,0.8)", borderRadius: 4, marginBottom: 12, overflow: "hidden", border: "1px solid rgba(139,28,28,0.15)" }}>
-            <div style={{
-              height: "100%", width: `${hpPercent}%`,
-              background: hpColor,
-              borderRadius: 4,
-              transition: "width 0.35s ease, background 0.35s ease",
-              boxShadow: `0 0 10px ${hpColor}55`,
-            }} />
+        <div className="cs-card" style={{
+          marginBottom: 20, padding: "14px 16px", background: "rgba(20,16,14,0.5)",
+          border: `1px solid ${isDown ? "rgba(196,92,62,0.55)" : "rgba(139,28,28,0.2)"}`, borderRadius: 3,
+        }}>
+          {/* Health bar - current HP, with temp HP stacked on the end */}
+          <div style={{ display: "flex", height: 10, background: "rgba(10,8,6,0.8)", borderRadius: 5, marginBottom: 12, overflow: "hidden", border: "1px solid rgba(139,28,28,0.15)" }}>
+            <div
+              className={`cs-hp-fill${hpPercent <= 25 ? " cs-hp-fill--critical" : ""}`}
+              style={{ width: `${hpPercent}%`, background: hpColor }}
+            />
+            {tempHp > 0 && <div className="cs-temp-fill" style={{ width: `${tempPercent}%` }} />}
           </div>
+
           {/* HP inputs row */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20, flexWrap: "wrap" }}>
             {/* Current / Max */}
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 9, letterSpacing: 2, color: "#d4a82a", textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>HP</span>
               <input
+                className="cs-input"
                 type="number"
                 value={currentHp}
                 min={0}
@@ -678,12 +987,18 @@ export default function CharacterSheet() {
                   padding: "2px 4px", outline: "none",
                 }}
               />
-              <span style={{ color: "#7a6a56", fontSize: 15, fontFamily: "'Fira Code', monospace" }}>/ {effectiveMaxHp}</span>
+              <span style={{ color: "#7a6a56", fontSize: 15, fontFamily: "'Fira Code', monospace" }}>
+                / {effectiveMaxHp}
+                {exhaustion >= 4 && (
+                  <span title="Exhaustion 4 halves your hit point maximum" style={{ color: "#c45c3e", fontSize: 11 }}> ▼</span>
+                )}
+              </span>
             </div>
             {/* Temp HP */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, borderLeft: "1px solid rgba(139,28,28,0.2)", paddingLeft: 20 }}>
               <span style={{ fontSize: 9, letterSpacing: 2, color: "#9a8060", textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>Temp</span>
               <input
+                className="cs-input"
                 type="number"
                 value={tempHp}
                 min={0}
@@ -699,60 +1014,303 @@ export default function CharacterSheet() {
               />
             </div>
             {/* Dice reference */}
-            <div style={{ display: "flex", gap: 16, borderLeft: "1px solid rgba(139,28,28,0.2)", paddingLeft: 20, flexWrap: "wrap" }}>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 9, letterSpacing: 2, color: "#8b1c1c", textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>Hemocraft Die</div>
-                <div style={{ fontSize: 13, color: "#c4b49a", fontFamily: "'Fira Code', monospace", marginTop: 1 }}>{CHAR.hemocraftDie}</div>
+            <div style={{ textAlign: "center", borderLeft: "1px solid rgba(139,28,28,0.2)", paddingLeft: 20 }}>
+              <div style={{ fontSize: 9, letterSpacing: 2, color: "#8b1c1c", textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>Hemocraft Die</div>
+              <div style={{ fontSize: 13, color: "#c4b49a", fontFamily: "'Fira Code', monospace", marginTop: 1 }}>{CHAR.hemocraftDie}</div>
+            </div>
+          </div>
+
+          {/* Damage / heal - temp HP absorbs damage first, healing clears death saves */}
+          <div className="cs-no-print" style={{
+            marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(139,28,28,0.15)",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flexWrap: "wrap",
+          }}>
+            <input
+              className="cs-input"
+              type="number"
+              min={0}
+              value={hpDelta}
+              placeholder="0"
+              onChange={(e) => setHpDelta(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") submitHpDelta(e.shiftKey ? "heal" : "damage"); }}
+              title="Enter applies damage · Shift+Enter heals"
+              style={{
+                width: 62, textAlign: "center", background: "rgba(10,8,6,0.8)",
+                border: "1px solid rgba(139,28,28,0.35)", borderRadius: 2, color: "#e8dcc4",
+                fontFamily: "'Fira Code', monospace", fontSize: 16, padding: "4px 6px", outline: "none",
+              }}
+            />
+            <button
+              className="cs-btn"
+              onClick={() => submitHpDelta("damage")}
+              style={{
+                background: "rgba(139,28,28,0.25)", border: "1px solid rgba(139,28,28,0.5)", color: "#f0c0c0",
+                fontFamily: "'Cinzel', serif", fontSize: 10, letterSpacing: 2, textTransform: "uppercase",
+                padding: "6px 16px", borderRadius: 2,
+              }}
+            >▼ Damage</button>
+            <button
+              className="cs-btn"
+              onClick={() => submitHpDelta("heal")}
+              style={{
+                background: "rgba(30,90,50,0.25)", border: "1px solid rgba(74,158,110,0.5)", color: "#8fd8a8",
+                fontFamily: "'Cinzel', serif", fontSize: 10, letterSpacing: 2, textTransform: "uppercase",
+                padding: "6px 16px", borderRadius: 2,
+              }}
+            >▲ Heal</button>
+
+            {/* Hit dice */}
+            <div style={{ display: "flex", gap: 14, alignItems: "center", borderLeft: "1px solid rgba(139,28,28,0.2)", paddingLeft: 16, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 9, letterSpacing: 2, color: "#9a8060", textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>Hit Dice</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <span style={{ fontFamily: "'Fira Code', monospace", fontSize: 10, color: "#7a6a56" }}>d8</span>
+                <PipTracker total={7} remaining={hitDice.d8} onSet={(v) => setHitDice(prev => ({ ...prev, d8: v }))} color="#c4a030" />
               </div>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 9, letterSpacing: 2, color: "#9a8060", textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>Hit Dice</div>
-                <div style={{ fontSize: 13, color: "#c4b49a", fontFamily: "'Fira Code', monospace", marginTop: 1 }}>{CHAR.hitDice}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <span style={{ fontFamily: "'Fira Code', monospace", fontSize: 10, color: "#7a6a56" }}>d6</span>
+                <PipTracker total={5} remaining={hitDice.d6} onSet={(v) => setHitDice(prev => ({ ...prev, d6: v }))} color="#8ab4d8" />
               </div>
             </div>
           </div>
+
+          {/* Death saves - only while down */}
+          {isDown && (
+            <div style={{
+              marginTop: 12, padding: "10px 14px", background: "rgba(139,28,28,0.14)",
+              border: "1px solid rgba(196,92,62,0.45)", borderRadius: 3,
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 20, flexWrap: "wrap",
+            }}>
+              <span style={{ fontSize: 10, letterSpacing: 3, color: "#c45c3e", textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>
+                Death Saves
+              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 9, letterSpacing: 1, color: "#8fd8a8", textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>Success</span>
+                <PipTracker total={3} remaining={deathSaves.successes} onSet={(v) => setDeathSaves(prev => ({ ...prev, successes: v }))} color="#4a9e6e" />
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 9, letterSpacing: 1, color: "#f0a0a0", textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>Failure</span>
+                <PipTracker total={3} remaining={deathSaves.failures} onSet={(v) => setDeathSaves(prev => ({ ...prev, failures: v }))} color="#8b1c1c" />
+              </div>
+              {deathSaves.successes >= 3 && (
+                <span style={{ fontSize: 11, color: "#8fd8a8", fontStyle: "italic" }}>Stable</span>
+              )}
+              {deathSaves.failures >= 3 && (
+                <span style={{ fontSize: 11, color: "#c45c3e", fontStyle: "italic" }}>Dead</span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Quick Stats Bar */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 8, marginBottom: 24 }}>
           {[
-            { label: "AC",         value: acDisplay,             song: bladesongActive, shield: shieldActive },
-            { label: "Initiative", value: initDisplay,           song: false,           shield: false        },
-            { label: "Speed",      value: speedDisplay,          song: bladesongActive, shield: false        },
-            { label: "Prof Bonus", value: `+${CHAR.profBonus}`,  song: false,           shield: false        },
-            { label: "Spell DC",   value: dcDisplay,             song: false,           shield: false        },
-            { label: "Spell Atk",  value: spellAtkDisplay,       song: false,           shield: false        },
+            { label: "AC",         value: acDisplay,             song: bladesongActive, shield: shieldActive, haste: hasteActive },
+            { label: "Initiative", value: initDisplay,           song: false,           shield: false,        haste: false       },
+            { label: "Speed",      value: speedDisplay,          song: bladesongActive, shield: false,        haste: hasteActive },
+            { label: "Prof Bonus", value: `+${CHAR.profBonus}`,  song: false,           shield: false,        haste: false       },
+            { label: "Spell DC",   value: dcDisplay,             song: false,           shield: false,        haste: false       },
+            { label: "Spell Atk",  value: spellAtkDisplay,       song: false,           shield: false,        haste: false       },
           ].map((s, i) => (
             <div key={i} style={{
               textAlign: "center", padding: "8px 4px",
-              background: s.shield ? "rgba(120,150,200,0.18)" : s.song ? "rgba(40,60,140,0.25)" : "rgba(20,16,14,0.5)",
-              border: `1px solid ${s.shield ? "rgba(180,210,255,0.45)" : s.song ? "rgba(120,160,240,0.4)" : "rgba(139,28,28,0.2)"}`,
+              background: s.shield ? "rgba(120,150,200,0.18)" : s.haste ? "rgba(160,110,20,0.22)" : s.song ? "rgba(40,60,140,0.25)" : "rgba(20,16,14,0.5)",
+              border: `1px solid ${s.shield ? "rgba(180,210,255,0.45)" : s.haste ? "rgba(255,180,70,0.45)" : s.song ? "rgba(120,160,240,0.4)" : "rgba(139,28,28,0.2)"}`,
               borderRadius: 3, transition: "all 0.25s ease",
             }}>
-              <div style={{ fontSize: 9, letterSpacing: 2, color: s.shield ? "#c8deff" : s.song ? "rgba(160,200,255,0.9)" : "#d4a82a", textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>{s.label}</div>
-              <div style={{ fontSize: 14, color: s.shield ? "#ddeeff" : s.song ? "#c8d8ff" : "#e8dcc4", fontFamily: "'Fira Code', monospace", marginTop: 2 }}>{s.value}</div>
+              <div style={{ fontSize: 9, letterSpacing: 2, color: s.shield ? "#c8deff" : s.haste ? "rgba(255,200,130,0.9)" : s.song ? "rgba(160,200,255,0.9)" : "#d4a82a", textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>{s.label}</div>
+              <div style={{ fontSize: 14, color: s.shield ? "#ddeeff" : s.haste ? "#ffd08a" : s.song ? "#c8d8ff" : "#e8dcc4", fontFamily: "'Fira Code', monospace", marginTop: 2 }}>{s.value}</div>
             </div>
           ))}
         </div>
 
-        {/* Immunities */}
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 9, letterSpacing: 2, color: "#9a8060", textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>Immune</span>
-          {["Poison Damage", "Poisoned Condition"].map((label) => (
-            <span key={label} style={{
-              fontSize: 9, letterSpacing: 1, textTransform: "uppercase",
-              fontFamily: "'Fira Code', monospace",
-              background: "rgba(30,90,30,0.3)", border: "1px solid rgba(60,160,60,0.4)", color: "#80c880",
-              padding: "2px 8px", borderRadius: 2,
-            }}>{label}</span>
-          ))}
-          <span style={{ fontSize: 10, color: "#7a6a56", fontFamily: "'EB Garamond', serif", fontStyle: "italic" }}>Strange Metabolism</span>
+        {/* Conditions, concentration, exhaustion */}
+        <div className="cs-card" style={{
+          marginBottom: 20, padding: "12px 14px", background: "rgba(20,16,14,0.4)",
+          border: `1px solid ${conditions.size > 0 || exhaustion > 0 ? "rgba(196,92,62,0.4)" : "rgba(139,28,28,0.15)"}`,
+          borderRadius: 3,
+        }}>
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            gap: 10, flexWrap: "wrap", marginBottom: 10,
+          }}>
+            <span style={{ fontSize: 11, letterSpacing: 3, textTransform: "uppercase", color: "#8b1c1c", fontFamily: "'Cinzel', serif", fontWeight: 700 }}>
+              Status
+            </span>
+            {conditions.size > 0 && (
+              <button
+                className="cs-btn cs-no-print"
+                onClick={() => setConditions(new Set())}
+                style={{
+                  background: "transparent", border: "1px solid rgba(139,28,28,0.35)", color: "#9a8060",
+                  fontFamily: "'Cinzel', serif", fontSize: 9, letterSpacing: 2, textTransform: "uppercase",
+                  padding: "3px 10px", borderRadius: 2,
+                }}
+              >Clear All</button>
+            )}
+          </div>
+
+          {/* Concentration */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+            <button
+              className="cs-btn"
+              onClick={() => (concentration.active ? dropConcentration() : setConcentration({ active: true, spell: "" }))}
+              style={{
+                background: concentration.active
+                  ? "linear-gradient(180deg, rgba(20,90,100,0.55), rgba(20,60,70,0.3))"
+                  : "rgba(30,25,20,0.6)",
+                border: `1px solid ${concentration.active ? "rgba(60,190,200,0.6)" : "#44362a"}`,
+                color: concentration.active ? "#80e0e8" : "#9a8060",
+                fontFamily: "'Cinzel', serif", fontSize: 10, letterSpacing: 2, textTransform: "uppercase",
+                padding: "6px 16px", borderRadius: 2,
+              }}
+            >
+              {concentration.active ? "◉" : "○"} Concentrating
+            </button>
+            {concentration.active && (
+              <>
+                <input
+                  className="cs-input"
+                  type="text"
+                  value={concentration.spell}
+                  placeholder="on what spell?"
+                  onChange={(e) => setConcentration(prev => ({ ...prev, spell: e.target.value }))}
+                  style={{
+                    flex: "1 1 160px", minWidth: 140, background: "rgba(10,8,6,0.7)",
+                    border: "1px solid rgba(60,190,200,0.3)", borderRadius: 2, color: "#c4b49a",
+                    fontFamily: "'EB Garamond', Georgia, serif", fontSize: 13, padding: "5px 10px", outline: "none",
+                  }}
+                />
+                <span
+                  title={bladesongActive ? "CON save + INT (Bladesong)" : "CON saving throw"}
+                  style={{ fontFamily: "'Fira Code', monospace", fontSize: 12, color: "#80e0e8", whiteSpace: "nowrap" }}
+                >
+                  save {formatMod(concSaveBonus)}{bladesongActive ? " ♪" : ""}
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* Prompted by taking damage while concentrating */}
+          {concPrompt !== null && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+              marginBottom: 10, padding: "8px 12px",
+              background: "rgba(20,90,100,0.15)", border: "1px solid rgba(60,190,200,0.4)", borderRadius: 3,
+            }}>
+              <span style={{ fontSize: 12, color: "#80e0e8", fontFamily: "'Fira Code', monospace" }}>
+                Concentration check - DC {concPrompt}, roll CON save {formatMod(concSaveBonus)}
+              </span>
+              <button
+                className="cs-btn"
+                onClick={() => setConcPrompt(null)}
+                style={{ background: "transparent", border: "1px solid rgba(60,190,200,0.35)", color: "#80e0e8", fontFamily: "'Cinzel', serif", fontSize: 9, letterSpacing: 2, textTransform: "uppercase", padding: "3px 10px", borderRadius: 2 }}
+              >Held</button>
+              <button
+                className="cs-btn"
+                onClick={dropConcentration}
+                style={{ background: "transparent", border: "1px solid rgba(139,28,28,0.45)", color: "#c45c3e", fontFamily: "'Cinzel', serif", fontSize: 9, letterSpacing: 2, textTransform: "uppercase", padding: "3px 10px", borderRadius: 2 }}
+              >Lost</button>
+            </div>
+          )}
+
+          {/* Haste's parting gift */}
+          {lethargy && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+              marginBottom: 10, padding: "8px 12px",
+              background: "rgba(160,110,20,0.15)", border: "1px solid rgba(255,180,70,0.45)", borderRadius: 3,
+            }}>
+              <span style={{ fontSize: 12, color: "#ffd08a", flex: 1 }}>
+                Haste ended - you can't move or take actions until after your next turn.
+              </span>
+              <button
+                className="cs-btn"
+                onClick={() => setLethargy(false)}
+                style={{
+                  background: "transparent", border: "1px solid rgba(255,180,70,0.4)", color: "#ffd08a",
+                  fontFamily: "'Cinzel', serif", fontSize: 9, letterSpacing: 2, textTransform: "uppercase",
+                  padding: "3px 10px", borderRadius: 2,
+                }}
+              >Passed</button>
+            </div>
+          )}
+
+          {/* Bladesong ends the moment you're incapacitated */}
+          {incapacitated && bladesongActive && (
+            <div style={{
+              marginBottom: 10, padding: "8px 12px", fontSize: 12, color: "#f0a0a0",
+              background: "rgba(139,28,28,0.15)", border: "1px solid rgba(196,92,62,0.45)", borderRadius: 3,
+            }}>
+              Incapacitated - Bladesong ends immediately.
+            </div>
+          )}
+
+          {/* Conditions */}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {CONDITIONS.map((condition) => (
+              <ConditionChip
+                key={condition.name}
+                condition={condition}
+                active={conditions.has(condition.name)}
+                immune={condition.immune}
+                onToggle={() => toggleCondition(condition.name)}
+              />
+            ))}
+          </div>
+
+          {/* Exhaustion */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+            marginTop: 12, paddingTop: 10, borderTop: "1px solid rgba(139,28,28,0.15)",
+          }}>
+            <span style={{ fontSize: 9, letterSpacing: 2, color: exhaustion > 0 ? "#c45c3e" : "#9a8060", textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>
+              Exhaustion
+            </span>
+            <div style={{ display: "flex", gap: 5 }}>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={i}
+                  onClick={() => setExhaustion(i < exhaustion ? i : i + 1)}
+                  title={EXHAUSTION_LEVELS[i + 1]}
+                  style={{
+                    width: 14, height: 14, borderRadius: 2, cursor: "pointer",
+                    background: i < exhaustion ? "#c45c3e" : "transparent",
+                    border: `1px solid ${i < exhaustion ? "#c45c3e" : "rgba(139,28,28,0.35)"}`,
+                    boxShadow: i < exhaustion ? "0 0 6px rgba(196,92,62,0.5)" : "none",
+                    transition: "all 0.15s",
+                  }}
+                />
+              ))}
+            </div>
+            <span style={{ fontSize: 11, color: exhaustion > 0 ? "#c45c3e" : "#7a6a56", fontStyle: "italic" }}>
+              {EXHAUSTION_LEVELS[exhaustion]}
+            </span>
+          </div>
+
+          {/* Immunities */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+            marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(139,28,28,0.15)",
+          }}>
+            <span style={{ fontSize: 9, letterSpacing: 2, color: "#9a8060", textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>Immune</span>
+            {["Poison Damage", "Poisoned Condition"].map((label) => (
+              <span key={label} style={{
+                fontSize: 9, letterSpacing: 1, textTransform: "uppercase",
+                fontFamily: "'Fira Code', monospace",
+                background: "rgba(30,90,30,0.3)", border: "1px solid rgba(60,160,60,0.4)", color: "#80c880",
+                padding: "2px 8px", borderRadius: 2,
+              }}>{label}</span>
+            ))}
+            <span style={{ fontSize: 10, color: "#7a6a56", fontFamily: "'EB Garamond', serif", fontStyle: "italic" }}>Strange Metabolism</span>
+          </div>
         </div>
 
         {/* Tab Navigation */}
-        <div style={{ display: "flex", gap: 0, marginBottom: 20, borderBottom: "1px solid rgba(139,28,28,0.3)" }}>
+        <div className="cs-tabs cs-no-print" style={{ marginBottom: 20, borderBottom: "1px solid rgba(139,28,28,0.3)" }}>
           {tabs.map((t) => (
             <button
               key={t.id}
+              className="cs-tab cs-btn"
               onClick={() => setTab(t.id)}
               style={{
                 flex: 1, padding: "10px 8px", border: "none",
@@ -768,7 +1326,7 @@ export default function CharacterSheet() {
 
         {/* COMBAT TAB */}
         {tab === "combat" && (
-          <div>
+          <div className="cs-panel">
             <Section title="Weapons">
               {/* ── Scythe Whip ── */}
               {(() => {
@@ -927,7 +1485,34 @@ export default function CharacterSheet() {
 
         {/* SPELLS TAB */}
         {tab === "spells" && (
-          <div>
+          <div className="cs-panel">
+            {/* Arcane Recovery - once per day, on a short rest */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+              marginBottom: 16, padding: "10px 14px",
+              background: arcaneRecoveryUsed ? "rgba(20,16,14,0.4)" : "rgba(20,80,70,0.14)",
+              border: `1px solid ${arcaneRecoveryUsed ? "rgba(60,50,40,0.4)" : "rgba(50,160,140,0.4)"}`,
+              borderRadius: 3, transition: "all 0.25s ease",
+            }}>
+              <span style={{
+                fontSize: 10, letterSpacing: 2, textTransform: "uppercase", fontFamily: "'Cinzel', serif",
+                color: arcaneRecoveryUsed ? "#7a6a56" : "#80d8c8", flex: 1,
+              }}>
+                Arcane Recovery - up to 3 slot levels back on a short rest
+              </span>
+              <button
+                className="cs-btn"
+                onClick={() => setArcaneRecoveryUsed(prev => !prev)}
+                style={{
+                  background: arcaneRecoveryUsed ? "rgba(30,25,20,0.6)" : "rgba(20,80,70,0.35)",
+                  border: `1px solid ${arcaneRecoveryUsed ? "#44362a" : "rgba(50,160,140,0.5)"}`,
+                  color: arcaneRecoveryUsed ? "#9a8060" : "#80d8c8",
+                  fontFamily: "'Cinzel', serif", fontSize: 9, letterSpacing: 2,
+                  textTransform: "uppercase", padding: "5px 14px", borderRadius: 2,
+                }}
+              >{arcaneRecoveryUsed ? "Spent - until long rest" : "Available"}</button>
+            </div>
+
             <Section title="Cantrips">
               {CHAR.cantrips.map((c) => {
                 const open = expandedSpells.has(c.name);
@@ -970,7 +1555,7 @@ export default function CharacterSheet() {
               <Section key={level} title={`${level} Level`} right={
                 <PipTracker
                   total={data.slots}
-                  remaining={spellSlots[level]}
+                  remaining={spellSlots[level] ?? data.slots}
                   onSet={(v) => setSpellSlots(prev => ({ ...prev, [level]: v }))}
                   color="#8ab4d8"
                 />
@@ -1019,7 +1604,7 @@ export default function CharacterSheet() {
 
         {/* FEATURES TAB */}
         {tab === "features" && (
-          <div>
+          <div className="cs-panel">
             <Section title="Mutagens — Click to Toggle">
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                 {CHAR.mutagens.map((m) => {
@@ -1120,24 +1705,24 @@ export default function CharacterSheet() {
               {/* Uses tracker */}
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, padding: "10px 14px", background: "rgba(139,28,28,0.1)", border: "1px solid rgba(139,28,28,0.3)", borderRadius: 3 }}>
                 <span style={{ fontSize: 9, letterSpacing: 2, color: "#8b1c1c", textTransform: "uppercase", fontFamily: "'Cinzel', serif", flex: 1 }}>
-                  Uses Remaining · Prof. Bonus / Long Rest
+                  Uses Remaining · 2 / Short Rest
                 </span>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  {Array.from({ length: CHAR.profBonus }).map((_, i) => (
+                  {Array.from({ length: BLOOD_MALEDICT_USES }).map((_, i) => (
                     <div
                       key={i}
-                      onClick={(e) => { e.stopPropagation(); setBloodCurseUses(i < bloodCurseUses ? i : i + 1); }}
+                      onClick={(e) => { e.stopPropagation(); setBloodCurseUses(i < bloodCurseRemaining ? i : i + 1); }}
                       style={{
                         width: 14, height: 14, borderRadius: "50%", cursor: "pointer",
-                        background: i < bloodCurseUses ? "#8b1c1c" : "transparent",
-                        border: `1px solid ${i < bloodCurseUses ? "#8b1c1c" : "rgba(139,28,28,0.4)"}`,
+                        background: i < bloodCurseRemaining ? "#8b1c1c" : "transparent",
+                        border: `1px solid ${i < bloodCurseRemaining ? "#8b1c1c" : "rgba(139,28,28,0.4)"}`,
                         transition: "all 0.15s",
-                        boxShadow: i < bloodCurseUses ? "0 0 6px rgba(139,28,28,0.5)" : "none",
+                        boxShadow: i < bloodCurseRemaining ? "0 0 6px rgba(139,28,28,0.5)" : "none",
                       }}
                     />
                   ))}
                 </div>
-                <span style={{ fontFamily: "'Fira Code', monospace", fontSize: 14, color: "#e8dcc4", minWidth: 24, textAlign: "center" }}>{bloodCurseUses}/{CHAR.profBonus}</span>
+                <span style={{ fontFamily: "'Fira Code', monospace", fontSize: 14, color: "#e8dcc4", minWidth: 24, textAlign: "center" }}>{bloodCurseRemaining}/{BLOOD_MALEDICT_USES}</span>
               </div>
               {CHAR.features.filter(f => f.name.startsWith("Blood Curse")).map((f) => {
                 const open = expandedFeatures.has(f.name);
@@ -1171,7 +1756,7 @@ export default function CharacterSheet() {
 
         {/* GEAR TAB */}
         {tab === "gear" && (
-          <div>
+          <div className="cs-panel">
             <Section title="Magic Items" accent="rgba(120,80,200,0.6)">
               <div style={{ display: "grid", gap: 8 }}>
                 {CHAR.magicItems.map((item) => {
@@ -1271,12 +1856,12 @@ export default function CharacterSheet() {
               placeholder: "Anything else — DM secrets learned, NPCs met, loose threads..." },
           ];
           return (
-            <div>
+            <div className="cs-panel">
               {fields.map(({ key, label, rows, placeholder }) => (
                 <Section key={key} title={label}>
                   <textarea
                     rows={rows}
-                    value={lore[key]}
+                    value={lore[key] ?? ""}
                     placeholder={placeholder}
                     onChange={(e) => setLore(prev => ({ ...prev, [key]: e.target.value }))}
                     onFocus={(e) => e.target.style.borderColor = "rgba(139,28,28,0.6)"}
