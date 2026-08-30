@@ -507,6 +507,8 @@ export default function CharacterSheet() {
   const [shieldActive, setShieldActive] = usePersistentState("shieldActive", false);
   const [hasteActive, setHasteActive] = usePersistentState("hasteActive", false);
   const [whipForm, setWhipForm] = usePersistentState("whipForm", false);
+  const [greaterInvisActive, setGreaterInvisActive] = usePersistentState("greaterInvisActive", false);
+  const [fireShield, setFireShield] = usePersistentState("fireShield", null); // null | "warm" | "chill"
   const [fifthFormula, setFifthFormula] = usePersistentState("fifthFormula", null);
   const [suppressedMutagen, setSuppressedMutagen] = usePersistentState("suppressedMutagen", null);
   const [metabolismUsed, setMetabolismUsed] = usePersistentState("metabolismUsed", false);
@@ -631,7 +633,12 @@ export default function CharacterSheet() {
   const activeFormulas = [...activeMutagens]
     .map((name) => ({ name, ...MUTAGEN_FORMULAS[name] }))
     .filter((f) => f.benefit);
-  const activeResistances   = activeFormulas.filter(f => f.resist).map(f => f.resist);
+  // Resistances come from mutagens and from Fire Shield, and are shown together in Status.
+  const fireShieldResist = fireShield === "warm" ? "Cold" : fireShield === "chill" ? "Fire" : null;
+  const activeResistances = [
+    ...activeFormulas.filter(f => f.resist).map(f => f.resist),
+    ...(fireShieldResist ? [fireShieldResist] : []),
+  ];
   const activeVulnerabilities = activeFormulas
     .filter(f => f.vulnerable && sideEffectApplies(f.name))
     .map(f => f.vulnerable);
@@ -747,31 +754,53 @@ export default function CharacterSheet() {
     setLethargy(Boolean(lethargic));
   };
 
-  const dropConcentration = () => {
+  const clearConcentrationField = () => {
     setConcentration({ active: false, spell: "" });
     setConcPrompt(null);
+  };
+
+  // Losing concentration ends every concentration spell at once.
+  const dropConcentration = () => {
+    clearConcentrationField();
     if (hasteActive) endHaste(true);
+    setGreaterInvisActive(false);
   };
 
   const toggleHaste = () => {
     if (hasteActive) {
       endHaste(true);
-      if (concentration.spell === "Haste") {
-        setConcentration({ active: false, spell: "" });
-        setConcPrompt(null);
-      }
+      if (concentration.spell === "Haste") clearConcentrationField();
       return;
     }
+    setGreaterInvisActive(false); // only one concentration spell at a time
     setHasteActive(true);
     setLethargy(false);
     setConcentration({ active: true, spell: "Haste" });
   };
+
+  const toggleGreaterInvis = () => {
+    if (greaterInvisActive) {
+      setGreaterInvisActive(false);
+      if (concentration.spell === "Greater Invisibility") clearConcentrationField();
+      return;
+    }
+    // Swapping off Haste still counts as Haste ending, so the lethargy applies.
+    if (hasteActive) endHaste(true);
+    setGreaterInvisActive(true);
+    setConcentration({ active: true, spell: "Greater Invisibility" });
+    setConcPrompt(null);
+  };
+
+  // Fire Shield has no concentration. Cycles off, warm (resist cold), chill (resist fire).
+  const cycleFireShield = () =>
+    setFireShield(prev => (prev === null ? "warm" : prev === "warm" ? "chill" : null));
 
   const shortRest = () => {
     setBladesongActive(false);
     setShieldActive(false);
     setBloodCurseUses(BLOOD_MALEDICT_USES); // Blood Maledict: 2 per short rest
     dropConcentration();
+    setFireShield(null);
     setLethargy(false); // a rest is not the spell ending mid-fight
   };
 
@@ -800,6 +829,7 @@ export default function CharacterSheet() {
     setBladesongActive(false);
     setShieldActive(false);
     setTattooMaulActive(false);
+    setFireShield(null);
     dropConcentration();
     setLethargy(false);
   };
@@ -1080,6 +1110,60 @@ export default function CharacterSheet() {
             {hasteActive && (
               <span style={{ color: "rgba(255,200,130,0.75)", fontSize: 9, marginLeft: 10 }}>
                 {effectiveSpeed} ft · +2 AC · adv. DEX saves · +1 action
+              </span>
+            )}
+          </button>
+          <button
+            className="cs-btn"
+            onClick={toggleGreaterInvis}
+            title="Greater Invisibility: advantage on your attacks, disadvantage on attacks against you. Concentration, 1 minute, one 4th-level slot."
+            style={{
+              background: greaterInvisActive
+                ? "linear-gradient(180deg, rgba(150,120,200,0.45), rgba(90,70,150,0.25))"
+                : "rgba(30,25,20,0.6)",
+              border: `1px solid ${greaterInvisActive ? "rgba(200,168,255,0.7)" : "#44362a"}`,
+              color: greaterInvisActive ? "#d8b8ff" : "#9a8060",
+              fontFamily: "'Cinzel', serif", fontSize: 10, letterSpacing: 2,
+              textTransform: "uppercase", padding: "7px 20px", borderRadius: 2,
+              cursor: "pointer", transition: "all 0.25s ease",
+              boxShadow: greaterInvisActive
+                ? "0 0 20px rgba(170,120,255,0.28), inset 0 0 16px rgba(170,120,255,0.1)"
+                : "none",
+            }}
+          >
+            {greaterInvisActive ? "◌" : "◍"} Greater Invis. {greaterInvisActive ? "Active" : "Inactive"}
+            {greaterInvisActive && (
+              <span style={{ color: "rgba(216,184,255,0.75)", fontSize: 9, marginLeft: 10 }}>
+                adv. attacks · disadv. against you
+              </span>
+            )}
+          </button>
+          <button
+            className="cs-btn"
+            onClick={cycleFireShield}
+            title="Fire Shield: click to cycle off, warm (resist cold, 2d8 fire back) and chill (resist fire, 2d8 cold back). 10 minutes, no concentration."
+            style={{
+              background: fireShield === "warm"
+                ? "linear-gradient(180deg, rgba(200,90,40,0.45), rgba(140,50,10,0.25))"
+                : fireShield === "chill"
+                  ? "linear-gradient(180deg, rgba(80,150,200,0.45), rgba(30,90,150,0.25))"
+                  : "rgba(30,25,20,0.6)",
+              border: `1px solid ${fireShield === "warm" ? "rgba(255,140,70,0.7)" : fireShield === "chill" ? "rgba(140,200,255,0.7)" : "#44362a"}`,
+              color: fireShield === "warm" ? "#ffb080" : fireShield === "chill" ? "#a8d8ff" : "#9a8060",
+              fontFamily: "'Cinzel', serif", fontSize: 10, letterSpacing: 2,
+              textTransform: "uppercase", padding: "7px 20px", borderRadius: 2,
+              cursor: "pointer", transition: "all 0.25s ease",
+              boxShadow: fireShield === "warm"
+                ? "0 0 20px rgba(255,120,50,0.28), inset 0 0 16px rgba(255,120,50,0.1)"
+                : fireShield === "chill"
+                  ? "0 0 20px rgba(120,180,255,0.28), inset 0 0 16px rgba(120,180,255,0.1)"
+                  : "none",
+            }}
+          >
+            {fireShield ? "◆" : "◇"} Fire Shield {fireShield === "warm" ? "Warm" : fireShield === "chill" ? "Chill" : "Inactive"}
+            {fireShield && (
+              <span style={{ color: fireShield === "warm" ? "rgba(255,176,128,0.75)" : "rgba(168,216,255,0.75)", fontSize: 9, marginLeft: 10 }}>
+                resist {fireShield === "warm" ? "cold" : "fire"} · 2d8 {fireShield === "warm" ? "fire" : "cold"} back
               </span>
             )}
           </button>
@@ -1515,6 +1599,35 @@ export default function CharacterSheet() {
             </span>
           </div>
 
+          {/* Resistances and vulnerabilities, from mutagens and Fire Shield */}
+          {(activeResistances.length > 0 || activeVulnerabilities.length > 0) && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap",
+              marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(139,28,28,0.15)",
+            }}>
+              <span style={{ fontSize: 9, letterSpacing: 2, color: "#9a8060", textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>Damage</span>
+              {activeResistances.map((type) => (
+                <span key={`r-${type}`} style={{
+                  fontSize: 9, letterSpacing: 1, textTransform: "uppercase", fontFamily: "'Fira Code', monospace",
+                  background: "rgba(30,90,30,0.3)", border: "1px solid rgba(60,160,60,0.4)", color: "#80c880",
+                  padding: "2px 8px", borderRadius: 2,
+                }}>{`Resist ${type}`}</span>
+              ))}
+              {activeVulnerabilities.map((type) => (
+                <span key={`v-${type}`} style={{
+                  fontSize: 9, letterSpacing: 1, textTransform: "uppercase", fontFamily: "'Fira Code', monospace",
+                  background: "rgba(139,28,28,0.25)", border: "1px solid rgba(196,92,62,0.45)", color: "#f0a0a0",
+                  padding: "2px 8px", borderRadius: 2,
+                }}>{`Vulnerable ${type}`}</span>
+              ))}
+              {fireShieldResist && (
+                <span style={{ fontSize: 10, color: "#7a6a56", fontFamily: "'EB Garamond', serif", fontStyle: "italic" }}>
+                  {`Fire Shield deals 2d8 ${fireShield === "warm" ? "fire" : "cold"} to melee attackers`}
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Immunities */}
           <div style={{
             display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
@@ -1605,7 +1718,12 @@ export default function CharacterSheet() {
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "72px 1fr", gap: "7px 12px", fontSize: 12, marginBottom: 10 }}>
                       <span style={lbl}>Attack</span>
-                      <span style={{ fontFamily: "'Fira Code', monospace", color: "#e8dcc4", fontSize: 17, fontWeight: 700 }}>{formatMod(atkBonus)} to hit</span>
+                      <span style={{ fontFamily: "'Fira Code', monospace", color: "#e8dcc4", fontSize: 17, fontWeight: 700 }}>
+                        {formatMod(atkBonus)} to hit
+                        {greaterInvisActive && (
+                          <span title="Greater Invisibility: advantage on attack rolls" style={{ color: "#d8b8ff", fontSize: 10, marginLeft: 8, letterSpacing: 1 }}>ADV ◌</span>
+                        )}
+                      </span>
 
                       <span style={lbl}>Damage</span>
                       <div style={{ fontFamily: "'Fira Code', monospace", lineHeight: 1.65 }}>
@@ -1649,7 +1767,12 @@ export default function CharacterSheet() {
                     <div style={{ fontFamily: "'Cinzel', serif", color: "#e8dcc4", fontSize: 14, marginBottom: 10 }}>Silver Pistol</div>
                     <div style={{ display: "grid", gridTemplateColumns: "72px 1fr", gap: "7px 12px", fontSize: 12, marginBottom: 10 }}>
                       <span style={lbl}>Attack</span>
-                      <span style={{ fontFamily: "'Fira Code', monospace", color: "#e8dcc4", fontSize: 17, fontWeight: 700 }}>{formatMod(atkBonus)} to hit</span>
+                      <span style={{ fontFamily: "'Fira Code', monospace", color: "#e8dcc4", fontSize: 17, fontWeight: 700 }}>
+                        {formatMod(atkBonus)} to hit
+                        {greaterInvisActive && (
+                          <span title="Greater Invisibility: advantage on attack rolls" style={{ color: "#d8b8ff", fontSize: 10, marginLeft: 8, letterSpacing: 1 }}>ADV ◌</span>
+                        )}
+                      </span>
 
                       <span style={lbl}>Damage</span>
                       <span style={{ fontFamily: "'Fira Code', monospace", color: "#c4b49a" }}>1d10 + {dmgMod} piercing</span>
@@ -1985,26 +2108,6 @@ export default function CharacterSheet() {
                       </div>
                     )}
                   </div>
-
-                  {/* Resistances and vulnerabilities from active mutagens */}
-                  {(activeResistances.length > 0 || activeVulnerabilities.length > 0) && (
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
-                      {activeResistances.map((type) => (
-                        <span key={`r-${type}`} style={{
-                          fontSize: 9, letterSpacing: 1, textTransform: "uppercase", fontFamily: "'Fira Code', monospace",
-                          background: "rgba(30,90,30,0.3)", border: "1px solid rgba(60,160,60,0.4)", color: "#80c880",
-                          padding: "2px 8px", borderRadius: 2,
-                        }}>Resist {type}</span>
-                      ))}
-                      {activeVulnerabilities.map((type) => (
-                        <span key={`v-${type}`} style={{
-                          fontSize: 9, letterSpacing: 1, textTransform: "uppercase", fontFamily: "'Fira Code', monospace",
-                          background: "rgba(139,28,28,0.25)", border: "1px solid rgba(196,92,62,0.45)", color: "#f0a0a0",
-                          padding: "2px 8px", borderRadius: 2,
-                        }}>Vulnerable {type}</span>
-                      ))}
-                    </div>
-                  )}
 
                   {/* Side effects in force, with anything Strange Metabolism has negated struck out */}
                   <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid rgba(139,28,28,0.15)" }}>

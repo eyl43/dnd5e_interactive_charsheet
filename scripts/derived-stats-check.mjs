@@ -98,6 +98,25 @@ try {
   html = render();
   check("whip plus maul reaches 15 ft", /15(<!-- -->)? ft/.test(html));
 
+  // Greater Invisibility takes concentration, so switching it on ends Haste, and it
+  // marks advantage on both weapon attack lines.
+  seed({ greaterInvisActive: true });
+  html = render();
+  check("Greater Invisibility marks advantage on attacks", (html.match(/ADV ◌/g) ?? []).length === 2);
+  check("Greater Invisibility shows as active", html.includes("adv. attacks · disadv. against you"));
+
+  // Fire Shield is a three-state control feeding the resistance chips.
+  seed({ fireShield: "warm" });
+  html = render();
+  check("warm Fire Shield resists cold", html.includes("Resist Cold"));
+  check("warm Fire Shield reports its retaliation", html.includes("2d8 fire to melee attackers"));
+  seed({ fireShield: "chill" });
+  html = render();
+  check("chill Fire Shield resists fire", html.includes("Resist Fire"));
+  seed({});
+  html = render();
+  check("no Fire Shield means no resistance chip", !html.includes("Resist Cold") && !html.includes("Resist Fire"));
+
   // Mutagen side effects are disadvantage-based, not stat penalties. With Celerity and
   // Sagacity active, STR must still read 8 and WIS must still read 10.
   seed({});
