@@ -8,12 +8,30 @@ import {
   usePersistentState,
 } from "./persistence.js";
 
-// Stat/speed deltas applied per active mutagen
-const MUTAGEN_EFFECTS = {
-  Celerity:       { DEX: 3, STR: -3 },
-  Sagacity:       { INT: 3, WIS: -3 },
-  Rapidity:       { speed: 10, INT: -3 },
-  Reconstruction: { speed: -10 },
+// Order of the Mutant formulas. `gain` is the mechanical half of the benefit and always
+// applies while the mutagen is active; `cost` and `vulnerable` are the mechanical half of
+// the side effect, which Strange Metabolism can suppress for a minute.
+const MUTAGEN_FORMULAS = {
+  Aether:         { benefit: "Flying speed 20 ft",                    side: "Disadvantage on STR and DEX checks" },
+  Alluring:       { benefit: "Advantage on CHA checks",               side: "Disadvantage on initiative rolls" },
+  Celerity:       { benefit: "+3 DEX",                                side: "Disadvantage on WIS saving throws", gain: { DEX: 3 }, saveDisadvantage: ["WIS"] },
+  Conversant:     { benefit: "Advantage on INT checks",               side: "Disadvantage on WIS checks" },
+  Cruelty:        { benefit: "Bonus action weapon attack",            side: "Disadvantage on INT, WIS and CHA saves", saveDisadvantage: ["INT", "WIS", "CHA"] },
+  Deftness:       { benefit: "Advantage on DEX checks",               side: "Disadvantage on WIS checks" },
+  Embers:         { benefit: "Resistance to fire damage",             side: "Vulnerability to cold damage", resist: "Fire", vulnerable: "Cold" },
+  Gelid:          { benefit: "Resistance to cold damage",             side: "Vulnerability to fire damage", resist: "Cold", vulnerable: "Fire" },
+  Impermeable:    { benefit: "Resistance to piercing damage",         side: "Vulnerability to slashing damage", resist: "Piercing", vulnerable: "Slashing" },
+  Mobility:       { benefit: "Immune to grappled and restrained",     side: "Disadvantage on STR checks" },
+  Nighteye:       { benefit: "Darkvision 60 ft, or +60 ft if you have it", side: "Disadvantage on attacks and Perception in direct sunlight" },
+  Percipient:     { benefit: "Advantage on WIS checks",               side: "Disadvantage on CHA checks" },
+  Potency:        { benefit: "+3 STR",                                side: "Disadvantage on DEX saving throws", gain: { STR: 3 }, saveDisadvantage: ["DEX"] },
+  Precision:      { benefit: "Critical hit on a roll of 19 or 20",    side: "Disadvantage on STR saving throws", saveDisadvantage: ["STR"] },
+  Rapidity:       { benefit: "+10 ft speed",                          side: "Disadvantage on INT checks", gain: { speed: 10 } },
+  Reconstruction: { benefit: "Regain prof. bonus HP at the start of your turn while below half HP", side: "Speed reduced by 10 ft", cost: { speed: -10 } },
+  Sagacity:       { benefit: "+3 INT",                                side: "Disadvantage on CHA saving throws", gain: { INT: 3 }, saveDisadvantage: ["CHA"] },
+  Shielded:       { benefit: "Resistance to slashing damage",         side: "Vulnerability to bludgeoning damage", resist: "Slashing", vulnerable: "Bludgeoning" },
+  Unbreakable:    { benefit: "Resistance to bludgeoning damage",      side: "Vulnerability to piercing damage", resist: "Bludgeoning", vulnerable: "Piercing" },
+  Vermillion:     { benefit: "One additional Blood Maledict use",     side: "Disadvantage on death saving throws" },
 };
 
 // Magic item stat effects: "set" raises the score to value (no effect if already >= value), "add" stacks additively
@@ -194,19 +212,17 @@ const CHAR = {
     // ── Character Level 6 ──────────────────────────────────────────
     { name: "Brand of Castigation",  source: "Blood Hunter 6",      action: "Passive",  desc: "When you hit a creature with a weapon attack, you can brand it. A branded creature takes INT modifier psychic damage (+4 or +5) each time it deals damage to you. You always know the direction of a branded creature on the same plane." },
     // ── Character Level 7 (Blood Hunter 7) ────────────────────────
-    { name: "Strange Metabolism",     source: "Mutant Order 7",     action: "Passive",  desc: "Your body can sustain 2 mutagens simultaneously. Imbibing a third requires you to choose which active one ends. Imbibing a mutagen takes an action and costs no HP." },
+    { name: "Strange Metabolism",     source: "Mutant Order 7",     action: "Bonus",    desc: "You gain immunity to poison damage and the poisoned condition. Additionally, once per long rest you can use a bonus action to ignore the side effect of one mutagen affecting you for 1 minute. You can concoct 2 mutagens per rest and know 5 formulas at this level." },
     { name: "Blood Curse of the Fallen Puppet", source: "Blood Hunter 7", action: "Reaction", desc: "Reaction: when a creature you can see drops to 0 HP, force it to immediately make one melee weapon attack against a target of your choice. Amplify: the creature also moves up to half its speed before attacking, and gains a bonus to the attack roll equal to your INT modifier (+4 or +5)." },
     // ── Character Level 8 (Wizard 1) ──────────────────────────────
     { name: "Arcane Recovery",        source: "Wizard 1",           action: "Special",  desc: "Once per day when you finish a short rest, recover expended spell slots with a combined level of up to half your Wizard level (rounded up). Slots recovered: up to 3 levels total (e.g. one 3rd-level, or one 2nd + one 1st)." },
     // ── Character Level 9 (Wizard 2 — Bladesinger) ────────────────
     { name: "Bladesong",              source: "Bladesinger 2",      action: "Bonus",    desc: "Bonus action: begin the Bladesong for 1 minute. While active: +INT modifier to AC (already reflected above when toggled), +10 ft speed, advantage on Acrobatics checks, and +INT modifier to concentration saving throws. Ends early if you don armor, are incapacitated, or use two hands to make an attack. 4 uses per long rest." },
   ],
-  mutagens: [
-    { name: "Celerity",       benefit: "+3 DEX",                                  drawback: "-3 STR"       },
-    { name: "Sagacity",       benefit: "+3 INT",                                  drawback: "-3 WIS"       },
-    { name: "Rapidity",       benefit: "+10 ft speed, Dash as bonus action",      drawback: "-3 INT"       },
-    { name: "Reconstruction", benefit: "Regen prof. bonus HP/turn when below half", drawback: "-10 speed"  },
-  ],
+  // Blood Hunter 7 knows 5 formulas and can concoct 2 mutagens per rest. The fifth
+  // formula is chosen in the Features tab and saved with the rest of the sheet.
+  knownFormulas: ["Celerity", "Sagacity", "Rapidity", "Reconstruction"],
+  formulasKnown: 5,
   equipment: [
     "Scythe Whip (Homebrew)",
     "Silver Pistol (Homebrew)",
@@ -235,7 +251,11 @@ const CHAR = {
 
 const formatMod = (n) => (n >= 0 ? `+${n}` : `${n}`);
 
-function StatBlock({ name, effectiveBase, effectiveMod, effectiveSave, saveProficient, changed, saveAdvantage }) {
+function StatBlock({ name, effectiveBase, effectiveMod, effectiveSave, saveProficient, changed, saveAdvantage, saveDisadvantage }) {
+  const disSources = saveDisadvantage ?? [];
+  const hasDisadvantage = disSources.length > 0;
+  // 5e: one of each cancels out, however many sources there are.
+  const cancelsOut = saveAdvantage && hasDisadvantage;
   return (
     <div style={{
       display: "flex", flexDirection: "column", alignItems: "center",
@@ -252,10 +272,25 @@ function StatBlock({ name, effectiveBase, effectiveMod, effectiveSave, saveProfi
       <div style={{ marginTop: 6, fontSize: 11, color: saveProficient ? "#d4a82a" : "#9a8060", letterSpacing: 1, textTransform: "uppercase" }}>
         Save {formatMod(effectiveSave)}{saveProficient ? " ★" : ""}
       </div>
-      {saveAdvantage && (
-        <div title="Haste: advantage on DEX saving throws"
-             style={{ marginTop: 2, fontSize: 9, letterSpacing: 1, color: "#ffd08a", fontFamily: "'Fira Code', monospace" }}>
-          ADV ⏵⏵
+      {(saveAdvantage || hasDisadvantage) && (
+        <div style={{
+          marginTop: 2, fontSize: 9, letterSpacing: 1, fontFamily: "'Fira Code', monospace",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 4, flexWrap: "wrap",
+        }}>
+          {saveAdvantage && (
+            <span title={`Haste: advantage on ${name} saving throws`} style={{ color: "#ffd08a" }}>ADV ⏵⏵</span>
+          )}
+          {hasDisadvantage && (
+            <span
+              title={`${disSources.join(", ")}: disadvantage on ${name} saving throws`}
+              style={{ color: "#f0a0a0" }}
+            >DIS ◆</span>
+          )}
+          {cancelsOut && (
+            <span title="Advantage and disadvantage cancel: roll a straight d20" style={{ color: "#7a6a56" }}>
+              = flat
+            </span>
+          )}
         </div>
       )}
     </div>
@@ -435,6 +470,9 @@ export default function CharacterSheet() {
   const [shieldActive, setShieldActive] = usePersistentState("shieldActive", false);
   const [hasteActive, setHasteActive] = usePersistentState("hasteActive", false);
   const [whipForm, setWhipForm] = usePersistentState("whipForm", false);
+  const [fifthFormula, setFifthFormula] = usePersistentState("fifthFormula", null);
+  const [suppressedMutagen, setSuppressedMutagen] = usePersistentState("suppressedMutagen", null);
+  const [metabolismUsed, setMetabolismUsed] = usePersistentState("metabolismUsed", false);
   const [bulletCount, setBulletCount] = usePersistentState("bullets", 0);
   const [bloodCurseUses, setBloodCurseUses] = usePersistentState("bloodCurseUses", BLOOD_MALEDICT_USES);
   const [expandedSpells, setExpandedSpells] = useState(new Set());
@@ -506,11 +544,19 @@ export default function CharacterSheet() {
       const next = new Set(prev);
       if (next.has(name)) {
         next.delete(name);
+        // Nothing left to suppress once the mutagen is flushed.
+        if (name === suppressedMutagen) setSuppressedMutagen(null);
       } else if (next.size < MAX_MUTAGENS) {
         next.add(name);
       }
       return next;
     });
+  };
+
+  // Strange Metabolism: once per long rest, ignore one mutagen's side effect for 1 minute.
+  const suppressSideEffect = (name) => {
+    setSuppressedMutagen(name);
+    setMetabolismUsed(true);
   };
 
   const toggleItem = (name) => {
@@ -524,11 +570,49 @@ export default function CharacterSheet() {
   const toggleSpell   = (n) => setExpandedSpells(prev => { const s = new Set(prev); s.has(n) ? s.delete(n) : s.add(n); return s; });
   const toggleFeature = (n) => setExpandedFeatures(prev => { const s = new Set(prev); s.has(n) ? s.delete(n) : s.add(n); return s; });
 
-  const getMutStatBonus = (stat) =>
-    [...activeMutagens].reduce((sum, n) => sum + (MUTAGEN_EFFECTS[n]?.[stat] ?? 0), 0);
+  // The five formulas known at this level: four fixed, plus the one chosen for the
+  // slot Blood Hunter 7 grants.
+  const knownMutagens = [...CHAR.knownFormulas, fifthFormula]
+    .filter(Boolean)
+    .map((name) => ({ name, ...MUTAGEN_FORMULAS[name] }));
 
-  const getSpeedBonus = () =>
-    [...activeMutagens].reduce((sum, n) => sum + (MUTAGEN_EFFECTS[n]?.speed ?? 0), 0);
+  // A suppressed side effect stops applying, so `cost` and `vulnerable` drop out.
+  const sideEffectApplies = (name) => name !== suppressedMutagen;
+
+  const sumMutagenEffects = (key) =>
+    [...activeMutagens].reduce((sum, name) => {
+      const formula = MUTAGEN_FORMULAS[name];
+      if (!formula) return sum;
+      const gain = formula.gain?.[key] ?? 0;
+      const cost = sideEffectApplies(name) ? (formula.cost?.[key] ?? 0) : 0;
+      return sum + gain + cost;
+    }, 0);
+
+  const getMutStatBonus = (stat) => sumMutagenEffects(stat);
+  const getSpeedBonus   = () => sumMutagenEffects("speed");
+
+  const activeFormulas = [...activeMutagens]
+    .map((name) => ({ name, ...MUTAGEN_FORMULAS[name] }))
+    .filter((f) => f.benefit);
+  const activeResistances   = activeFormulas.filter(f => f.resist).map(f => f.resist);
+  const activeVulnerabilities = activeFormulas
+    .filter(f => f.vulnerable && sideEffectApplies(f.name))
+    .map(f => f.vulnerable);
+  // Which saving throws are at disadvantage right now, and from which mutagen.
+  // A side effect negated by Strange Metabolism drops out of this.
+  const disadvantagedSaves = {};
+  for (const name of activeMutagens) {
+    if (!sideEffectApplies(name)) continue;
+    for (const stat of MUTAGEN_FORMULAS[name]?.saveDisadvantage ?? []) {
+      (disadvantagedSaves[stat] ??= []).push(name);
+    }
+  }
+
+  const activeSideEffects = activeFormulas.map(f => ({
+    name: f.name,
+    text: f.side,
+    suppressed: !sideEffectApplies(f.name),
+  }));
 
   const getEffectiveBase = (stat) => {
     let score = CHAR.stats[stat].base + getMutStatBonus(stat);
@@ -666,6 +750,8 @@ export default function CharacterSheet() {
     setMutageNDoses(4);
     setBloodCurseUses(BLOOD_MALEDICT_USES);
     setArcaneRecoveryUsed(false);
+    setMetabolismUsed(false);
+    setSuppressedMutagen(null);
 
     const restedExhaustion = Math.max(0, exhaustion - 1);
     setExhaustion(restedExhaustion);
@@ -787,7 +873,7 @@ export default function CharacterSheet() {
               : `Mutagen${activeMutagens.size > 1 ? "s" : ""} Active (${activeMutagens.size}/${MAX_MUTAGENS}) · Strange Metabolism`}
           </div>
           <div style={{ display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
-            {CHAR.mutagens.map((m) => {
+            {knownMutagens.map((m) => {
               const isActive  = activeMutagens.has(m.name);
               const isFull    = !isActive && activeMutagens.size >= MAX_MUTAGENS;
               return (
@@ -796,7 +882,7 @@ export default function CharacterSheet() {
                   className="cs-btn"
                   onClick={() => toggleMutagen(m.name)}
                   disabled={isFull}
-                  title={isFull ? "Strange Metabolism: max 2 mutagens active" : `${m.benefit} / ${m.drawback}`}
+                  title={isFull ? "You can only sustain 2 mutagens at a time" : `↑ ${m.benefit}\n↓ ${m.side}`}
                   style={{
                     background: isActive
                       ? "linear-gradient(180deg, rgba(139,28,28,0.5), rgba(139,28,28,0.2))"
@@ -815,7 +901,75 @@ export default function CharacterSheet() {
               );
             })}
           </div>
+
+          {/* Strange Metabolism: suppress one active mutagen's side effect, 1/long rest */}
+          <div className="cs-no-print" style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+            {suppressedMutagen ? (
+              <>
+                <span style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  fontFamily: "'Cinzel', serif", fontSize: 10, letterSpacing: 2, textTransform: "uppercase",
+                  background: "linear-gradient(180deg, rgba(20,80,70,0.5), rgba(20,60,55,0.25))",
+                  border: "1px solid rgba(50,160,140,0.6)", color: "#80d8c8",
+                  padding: "6px 14px", borderRadius: 2,
+                }}>
+                  ◉ {suppressedMutagen} side effect negated
+                  <span style={{ color: "rgba(128,216,200,0.65)", fontSize: 9, textTransform: "none", letterSpacing: 0 }}>
+                    · 1 minute
+                  </span>
+                </span>
+                <button
+                  className="cs-btn"
+                  onClick={() => setSuppressedMutagen(null)}
+                  title="End the suppression early. It does not give the use back."
+                  style={{
+                    background: "transparent", border: "1px solid rgba(50,160,140,0.35)", color: "#7a6a56",
+                    fontFamily: "'Cinzel', serif", fontSize: 9, letterSpacing: 2, textTransform: "uppercase",
+                    padding: "4px 10px", borderRadius: 2,
+                  }}
+                >End</button>
+              </>
+            ) : metabolismUsed ? (
+              <span style={{
+                fontFamily: "'Cinzel', serif", fontSize: 9, letterSpacing: 2, textTransform: "uppercase",
+                color: "#5a4c3e", border: "1px solid rgba(60,50,40,0.5)", background: "rgba(20,16,14,0.4)",
+                padding: "6px 14px", borderRadius: 2,
+              }}>
+                ○ Strange Metabolism spent · returns on a long rest
+              </span>
+            ) : activeMutagens.size === 0 ? (
+              <span style={{
+                fontFamily: "'Cinzel', serif", fontSize: 9, letterSpacing: 2, textTransform: "uppercase",
+                color: "#5a4c3e", padding: "6px 0",
+              }}>
+                ○ Strange Metabolism ready · imbibe a mutagen to suppress its side effect
+              </span>
+            ) : (
+              <>
+                <span style={{
+                  fontFamily: "'Cinzel', serif", fontSize: 9, letterSpacing: 2, textTransform: "uppercase",
+                  color: "#80d8c8",
+                }}>
+                  ◈ Strange Metabolism · negate a side effect
+                </span>
+                {[...activeMutagens].map((name) => (
+                  <button
+                    key={name}
+                    className="cs-btn"
+                    onClick={() => suppressSideEffect(name)}
+                    title={`Bonus action: ignore ${name}'s side effect (${MUTAGEN_FORMULAS[name]?.side}) for 1 minute. Once per long rest.`}
+                    style={{
+                      background: "rgba(20,80,70,0.25)", border: "1px solid rgba(50,160,140,0.45)",
+                      color: "#80d8c8", fontFamily: "'Cinzel', serif", fontSize: 9, letterSpacing: 2,
+                      textTransform: "uppercase", padding: "5px 12px", borderRadius: 2,
+                    }}
+                  >{name}</button>
+                ))}
+              </>
+            )}
+          </div>
         </div>
+
 
         {/* Active Ability Toggles */}
         <div className="cs-toggles" style={{ marginBottom: 20, display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
@@ -948,6 +1102,7 @@ export default function CharacterSheet() {
                 saveProficient={data.prof}
                 changed={changed}
                 saveAdvantage={statName === "DEX" && dexSaveAdvantage}
+                saveDisadvantage={disadvantagedSaves[statName]}
               />
             );
           })}
@@ -1655,20 +1810,21 @@ export default function CharacterSheet() {
         {/* FEATURES TAB */}
         {tab === "features" && (
           <div className="cs-panel">
-            <Section title="Mutagens — Click to Toggle">
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                {CHAR.mutagens.map((m) => {
-                  const isActive = activeMutagens.has(m.name);
-                  const isFull   = !isActive && activeMutagens.size >= MAX_MUTAGENS;
+            <Section title={`Mutagens - ${knownMutagens.length}/${CHAR.formulasKnown} Formulas Known`}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 8 }}>
+                {knownMutagens.map((m) => {
+                  const isActive   = activeMutagens.has(m.name);
+                  const isFull     = !isActive && activeMutagens.size >= MAX_MUTAGENS;
+                  const isNegated  = m.name === suppressedMutagen;
                   return (
                     <div
                       key={m.name}
                       onClick={() => toggleMutagen(m.name)}
-                      title={isFull ? "Strange Metabolism: max 2 mutagens active" : undefined}
+                      title={isFull ? "You can only sustain 2 mutagens at a time" : undefined}
                       style={{
                         padding: "10px 12px",
                         background: isActive ? "rgba(139,28,28,0.18)" : "rgba(20,16,14,0.3)",
-                        border: `1px solid ${isActive ? "rgba(139,28,28,0.5)" : "rgba(60,50,40,0.3)"}`,
+                        border: `1px solid ${isNegated ? "rgba(50,160,140,0.5)" : isActive ? "rgba(139,28,28,0.5)" : "rgba(60,50,40,0.3)"}`,
                         borderRadius: 3,
                         cursor: isFull ? "not-allowed" : "pointer",
                         opacity: isFull ? 0.45 : 1,
@@ -1676,15 +1832,90 @@ export default function CharacterSheet() {
                         userSelect: "none",
                       }}
                     >
-                      <div style={{ fontFamily: "'Cinzel', serif", fontSize: 13, color: isActive ? "#e8dcc4" : "#9a8060", display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ fontFamily: "'Cinzel', serif", fontSize: 13, color: isActive ? "#e8dcc4" : "#9a8060", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                         <span style={{ color: isActive ? "#8b1c1c" : "#44362a" }}>{isActive ? "◆" : "◇"}</span>
                         {m.name}
+                        {m.name === fifthFormula && (
+                          <span style={{ fontSize: 8, letterSpacing: 1, color: "#7a6a56", textTransform: "uppercase" }}>5th formula</span>
+                        )}
                       </div>
                       <div style={{ fontSize: 11, marginTop: 4, color: isActive ? "#d4a82a" : "#7a6a56" }}>↑ {m.benefit}</div>
-                      <div style={{ fontSize: 11, color: isActive ? "#8b4444" : "#7a6a56" }}>↓ {m.drawback}</div>
+                      <div style={{
+                        fontSize: 11,
+                        color: isNegated ? "#5a7a70" : isActive ? "#8b4444" : "#7a6a56",
+                        textDecoration: isNegated ? "line-through" : "none",
+                      }}>↓ {m.side}</div>
+                      {isNegated && (
+                        <div style={{ fontSize: 9, letterSpacing: 1, color: "#80d8c8", textTransform: "uppercase", fontFamily: "'Cinzel', serif", marginTop: 3 }}>
+                          ◉ Negated · Strange Metabolism
+                        </div>
+                      )}
                     </div>
                   );
                 })}
+
+                {/* Blood Hunter 7 grants a fifth formula. Pick it here. */}
+                {!fifthFormula && (
+                  <div style={{
+                    padding: "10px 12px", background: "rgba(20,80,70,0.1)",
+                    border: "1px dashed rgba(50,160,140,0.45)", borderRadius: 3,
+                  }}>
+                    <div style={{ fontFamily: "'Cinzel', serif", fontSize: 12, color: "#80d8c8" }}>
+                      ◇ Fifth formula unchosen
+                    </div>
+                    <div style={{ fontSize: 11, marginTop: 4, color: "#7a6a56" }}>
+                      Blood Hunter 7 knows 5 formulas. Pick your fifth below.
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Formula catalogue: choose or swap the fifth formula */}
+              <div className="cs-no-print" style={{ marginTop: 10, padding: "10px 14px", background: "rgba(10,8,6,0.5)", border: `1px solid ${fifthFormula ? "rgba(139,28,28,0.2)" : "rgba(50,160,140,0.35)"}`, borderRadius: 3 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+                  <span style={{ fontSize: 9, letterSpacing: 2, color: fifthFormula ? "#8b1c1c" : "#80d8c8", textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>
+                    {fifthFormula ? "Fifth Formula - Swap" : "Fifth Formula - Choose One"}
+                  </span>
+                  {fifthFormula && (
+                    <button
+                      className="cs-btn"
+                      onClick={() => { setFifthFormula(null); if (suppressedMutagen === fifthFormula) setSuppressedMutagen(null); }}
+                      style={{
+                        background: "transparent", border: "1px solid rgba(139,28,28,0.35)", color: "#7a6a56",
+                        fontFamily: "'Cinzel', serif", fontSize: 9, letterSpacing: 2, textTransform: "uppercase",
+                        padding: "3px 10px", borderRadius: 2,
+                      }}
+                    >Clear</button>
+                  )}
+                </div>
+                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                  {Object.entries(MUTAGEN_FORMULAS)
+                    .filter(([name]) => !CHAR.knownFormulas.includes(name))
+                    .map(([name, formula]) => {
+                      const chosen = name === fifthFormula;
+                      return (
+                        <button
+                          key={name}
+                          className="cs-btn"
+                          onClick={() => setFifthFormula(chosen ? null : name)}
+                          title={`↑ ${formula.benefit}\n↓ ${formula.side}`}
+                          style={{
+                            background: chosen ? "rgba(20,80,70,0.4)" : "rgba(20,16,14,0.5)",
+                            border: `1px solid ${chosen ? "rgba(50,160,140,0.6)" : "#3a2e24"}`,
+                            color: chosen ? "#80d8c8" : formula.resist ? "#c4b49a" : "#9a8060",
+                            fontFamily: "'Cinzel', serif", fontSize: 9, letterSpacing: 1,
+                            textTransform: "uppercase", padding: "4px 10px", borderRadius: 2,
+                          }}
+                        >
+                          {chosen ? "◆ " : ""}{name}
+                          {formula.resist && <span style={{ color: "#6fae8a", marginLeft: 4 }}>◈</span>}
+                        </button>
+                      );
+                    })}
+                </div>
+                <div style={{ fontSize: 10, color: "#7a6a56", marginTop: 8, fontStyle: "italic" }}>
+                  Hover any formula for its benefit and side effect. <span style={{ color: "#6fae8a" }}>◈</span> marks the ones that grant damage resistance.
+                </div>
               </div>
 
               {/* Live Active Effects Summary */}
@@ -1717,9 +1948,41 @@ export default function CharacterSheet() {
                       </div>
                     )}
                   </div>
+
+                  {/* Resistances and vulnerabilities from active mutagens */}
+                  {(activeResistances.length > 0 || activeVulnerabilities.length > 0) && (
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                      {activeResistances.map((type) => (
+                        <span key={`r-${type}`} style={{
+                          fontSize: 9, letterSpacing: 1, textTransform: "uppercase", fontFamily: "'Fira Code', monospace",
+                          background: "rgba(30,90,30,0.3)", border: "1px solid rgba(60,160,60,0.4)", color: "#80c880",
+                          padding: "2px 8px", borderRadius: 2,
+                        }}>Resist {type}</span>
+                      ))}
+                      {activeVulnerabilities.map((type) => (
+                        <span key={`v-${type}`} style={{
+                          fontSize: 9, letterSpacing: 1, textTransform: "uppercase", fontFamily: "'Fira Code', monospace",
+                          background: "rgba(139,28,28,0.25)", border: "1px solid rgba(196,92,62,0.45)", color: "#f0a0a0",
+                          padding: "2px 8px", borderRadius: 2,
+                        }}>Vulnerable {type}</span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Side effects in force, with anything Strange Metabolism has negated struck out */}
+                  <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid rgba(139,28,28,0.15)" }}>
+                    {activeSideEffects.map(({ name, text, suppressed }) => (
+                      <div key={name} style={{ fontSize: 11, color: suppressed ? "#5a7a70" : "#8b4444", lineHeight: 1.6 }}>
+                        <span style={{ color: "#7a6a56" }}>{name}: </span>
+                        <span style={{ textDecoration: suppressed ? "line-through" : "none" }}>{text}</span>
+                        {suppressed && <span style={{ color: "#80d8c8", marginLeft: 6 }}>◉ negated</span>}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </Section>
+
 
             <Section title="Class Features">
               {CHAR.features.map((f) => {

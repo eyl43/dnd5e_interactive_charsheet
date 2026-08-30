@@ -79,6 +79,20 @@ Turning Haste on sets your concentration to Haste, and losing concentration drop
 Order of operations for speed: the Bladesong bonus applies first, then Haste doubles the total, then exhaustion halves it.
 So Bladesong plus Haste is (30 + 10) x 2 = 80 ft.
 
+## Mutagens
+
+Formulas follow the current Order of the Mutant text, where side effects impose disadvantage rather than draining ability scores.
+Celerity is +3 DEX with disadvantage on WIS saves, Sagacity is +3 INT with disadvantage on CHA saves, and Rapidity is +10 ft speed with disadvantage on INT checks.
+Reconstruction is the one whose side effect is still a hard number, at -10 ft of speed.
+
+Blood Hunter 7 knows five formulas and concocts two mutagens per rest.
+The first four are fixed in the `CHAR` object; the fifth is chosen in the Features tab from the full catalogue of twenty formulas and saved with the rest of the sheet.
+Formulas marked with a green diamond grant damage resistance, which is the only on-demand resistance this character has.
+
+Strange Metabolism carries a second ability beyond poison immunity: once per long rest, a bonus action negates the side effect of one mutagen affecting you for 1 minute.
+The control sits under the mutagen toggles and offers one button per active mutagen.
+A negated side effect is struck through wherever it appears, and where the side effect is a real number, such as Reconstruction's speed penalty, the sheet adds the movement back.
+
 ## Weapon forms
 
 The Scythe Whip card has a Scythe / Whip toggle, since transforming it is a bonus action you take mid-fight.

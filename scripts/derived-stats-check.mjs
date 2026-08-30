@@ -26,6 +26,17 @@ const seed = (state) => {
 const results = [];
 const check = (label, ok) => results.push([label, ok]);
 
+// Slice one stat block out of the rendered sheet, so a marker can be attributed to the
+// right stat instead of matching one belonging to a neighbour.
+const STAT_ORDER = ["STR", "DEX", "CON", "INT", "WIS", "CHA"];
+const statBlock = (html, stat) => {
+  const start = html.indexOf(`>${stat}</span>`);
+  if (start === -1) return "";
+  const next = STAT_ORDER[STAT_ORDER.indexOf(stat) + 1];
+  const end = next ? html.indexOf(`>${next}</span>`, start) : -1;
+  return html.slice(start, end === -1 ? start + 900 : end);
+};
+
 const server = await createServer({ server: { middlewareMode: true }, appType: "custom", logLevel: "error" });
 try {
   const { default: CharacterSheet } = await server.ssrLoadModule("/src/App.jsx");
@@ -86,6 +97,56 @@ try {
   seed({ whipForm: true, tattooMaulActive: true });
   html = render();
   check("whip plus maul reaches 15 ft", /15(<!-- -->)? ft/.test(html));
+
+  // Mutagen side effects are disadvantage-based, not stat penalties. With Celerity and
+  // Sagacity active, STR must still read 8 and WIS must still read 10.
+  seed({});
+  html = render();
+  check("Celerity no longer drains STR", /STR<\/span>[\s\S]{0,400}?>8</.test(html));
+  check("Sagacity no longer drains WIS", /WIS<\/span>[\s\S]{0,400}?>10</.test(html));
+  check("Celerity still grants +3 DEX", /DEX<\/span>[\s\S]{0,400}?>22</.test(html));
+  check("Sagacity still grants +3 INT", /INT<\/span>[\s\S]{0,400}?>21</.test(html));
+
+  // Celerity and Sagacity put WIS and CHA saves at disadvantage, marked on the stat blocks.
+  check("WIS save marked DIS by Celerity", statBlock(html, "WIS").includes("DIS ◆"));
+  check("CHA save marked DIS by Sagacity", statBlock(html, "CHA").includes("DIS ◆"));
+  check("DIS marker names its source", html.includes("Celerity: disadvantage on WIS saving throws"));
+  check("STR carries no DIS marker", !statBlock(html, "STR").includes("DIS ◆"));
+  check("DEX carries no DIS marker", !statBlock(html, "DEX").includes("DIS ◆"));
+
+  // Negating a side effect must clear its DIS marker too.
+  seed({ suppressedMutagen: "Celerity", metabolismUsed: true });
+  html = render();
+  check("negating Celerity clears the WIS DIS marker", !statBlock(html, "WIS").includes("DIS ◆"));
+  check("Sagacity's CHA DIS marker survives", statBlock(html, "CHA").includes("DIS ◆"));
+
+  // Advantage and disadvantage on the same save cancel out. Potency disadvantages DEX
+  // saves, Haste advantages them.
+  seed({ fifthFormula: "Potency", mutagens: { __type: "Set", values: ["Potency"] }, hasteActive: true });
+  html = render();
+  const dexBlock = statBlock(html, "DEX");
+  check("DEX save shows the advantage marker", dexBlock.includes("ADV ⏵⏵"));
+  check("DEX save shows the disadvantage marker", dexBlock.includes("DIS ◆"));
+  check("DEX save notes the two cancel out", dexBlock.includes("= flat"));
+
+  // Strange Metabolism offers a suppression button per active mutagen, and reports
+  // the negation once one is chosen.
+  check("metabolism offers a suppression choice", html.includes("negate a side effect"));
+  seed({ suppressedMutagen: "Celerity", metabolismUsed: true });
+  html = render();
+  check("metabolism reports the negated mutagen", html.includes("side effect negated"));
+  seed({ metabolismUsed: true });
+  html = render();
+  check("spent metabolism is shown as spent", html.includes("Strange Metabolism spent"));
+
+  // Reconstruction's -10 ft speed is part of its side effect, so suppressing it
+  // restores the lost movement: 20 ft back up to 30 ft.
+  seed({ mutagens: { __type: "Set", values: ["Reconstruction"] } });
+  html = render();
+  check("Reconstruction costs 10 ft of speed", /20(<!-- -->)? ft/.test(html));
+  seed({ mutagens: { __type: "Set", values: ["Reconstruction"] }, suppressedMutagen: "Reconstruction", metabolismUsed: true });
+  html = render();
+  check("suppressing Reconstruction restores the speed", /30(<!-- -->)? ft/.test(html));
 
   // Skills render above the tab bar, so they are visible whichever tab is open.
   seed({});
