@@ -1,6 +1,6 @@
 # DND 5e Interactive Character Sheet
 
-An interactive character sheet for Dr. Lucien Harrow, a Blood Hunter (Mutant) 7 / Bladesinger Wizard 5.
+An interactive character sheet for Dr. Lucien Harrow, a Blood Hunter (Mutant) 7 / Bladesinger Wizard 7, character level 14.
 Code may need to be heavily modified for other classes.
 
 Live sheet: https://eyl43.github.io/dnd5e_interactive_charsheet/
@@ -31,7 +31,7 @@ Pushing to `main` deploys to GitHub Pages through `.github/workflows/deploy.yml`
 Everything the sheet tracks during play is written to the browser's `localStorage` as you change it, under the `lucien-harrow/v1/` namespace.
 Close the tab, come back next session, and current HP, conditions, spell slots, and the rest are exactly where you left them.
 
-What persists: current and temp HP, conditions, exhaustion, concentration, death saves, hit dice, spell slots, Bladesong and Blood Maledict uses, mutagen doses, active mutagens, attuned items, the Bladesong / Eldritch Maul / Shield toggles, bullet count, Arcane Recovery, and every lore field.
+What persists: current and temp HP, conditions, exhaustion, concentration, death saves, hit dice, spell slots, Bladesong and Blood Maledict uses, mutagen doses, active mutagens, attuned items, the buff toggles, the weapon form, the chosen fifth mutagen formula, bullet count, Arcane Recovery, and every lore field.
 What does not persist: which tab is open and which cards are expanded, since those are just where you happen to be looking.
 
 Saved state lives in one browser on one machine.
@@ -50,7 +50,7 @@ The health panel handles the whole damage pipeline rather than just holding a nu
 - Type a number and hit **Damage** (or press Enter) to apply it.
 - Temporary HP absorbs damage first, automatically, before current HP is touched.
 - **Heal** (or Shift+Enter) heals and clears any death saves.
-- Hit dice are tracked as two pools, 7d8 from Blood Hunter and 5d6 from Wizard.
+- Hit dice are tracked as two pools, 7d8 from Blood Hunter and 7d6 from Wizard.
 - Death saves appear on their own once you drop to 0 HP, and disappear when you are healed.
 
 The status panel tracks all fourteen conditions, plus exhaustion and concentration.
@@ -64,7 +64,7 @@ The status panel tracks all fourteen conditions, plus exhaustion and concentrati
 
 ## Buff toggles
 
-The four buttons under the header are the buffs that change your numbers, and every toggle recalculates the sheet live.
+The buttons under the header are the buffs that change your numbers, and every toggle recalculates the sheet live.
 
 | Toggle | What it applies |
 | --- | --- |
@@ -72,9 +72,13 @@ The four buttons under the header are the buffs that change your numbers, and ev
 | Eldritch Maul | +5 ft reach and +1d6 force on melee attacks, shown on the weapon cards |
 | Shield | +5 AC |
 | Haste | Speed doubled, +2 AC, advantage on DEX saving throws, one extra limited action |
+| Greater Invisibility | Advantage on your attacks, disadvantage on attacks against you |
+| Fire Shield | Warm resists cold and burns attackers for 2d8 fire, chill resists fire and freezes them for 2d8 cold |
 
-Haste is a concentration spell, so the sheet wires the two together.
-Turning Haste on sets your concentration to Haste, and losing concentration drops Haste and raises the lethargy reminder, since you cannot move or act until after your next turn.
+Haste and Greater Invisibility are both concentration spells, so the sheet wires them together.
+Starting either one ends the other, and losing concentration ends both.
+Fire Shield needs no concentration and runs alongside anything.
+Dropping Haste, whether deliberately or by losing concentration, raises the lethargy reminder, since you cannot move or act until after your next turn.
 
 Order of operations for speed: the Bladesong bonus applies first, then Haste doubles the total, then exhaustion halves it.
 So Bladesong plus Haste is (30 + 10) x 2 = 80 ft.
@@ -110,13 +114,13 @@ Only weapons, spells, features, gear, and lore are behind tabs.
 **Short Rest** ends Bladesong, Shield, and concentration, and restores both Blood Maledict uses.
 Spend hit dice yourself from the health panel.
 
-**Long Rest** restores HP to full, refills spell slots, Bladesong uses, mutagen doses, and Blood Maledict uses, returns 6 hit dice (half your level, larger dice first), resets Arcane Recovery, clears every condition, removes one level of exhaustion, and drops all active toggles.
+**Long Rest** restores HP to full, refills spell slots, Bladesong uses, mutagen doses, and Blood Maledict uses, returns 7 hit dice (half your level, larger dice first), resets Arcane Recovery, clears every condition, removes one level of exhaustion, and drops all active toggles.
 
 ## Attunement and max HP
 
 The Amulet of Health is attuned by default, which sets CON to 19.
-Max HP is derived rather than hardcoded, so that attunement is what puts you at 99 rather than 75.
-Un-attuning it in the Gear tab drops max HP back to 75 and pulls current HP down with it, and the same clamp applies when exhaustion 4 halves your maximum.
+Max HP is derived rather than hardcoded, so that attunement is what puts you at 115 rather than 87.
+Un-attuning it in the Gear tab drops max HP back to 87 and pulls current HP down with it, and the same clamp applies when exhaustion 4 halves your maximum.
 
 ## Project layout
 
@@ -130,3 +134,11 @@ scripts/             headless checks run by npm run check
 
 To change anything about the character, edit the `CHAR` object near the top of `src/App.jsx`.
 Stats, spells, features, and gear all come from there, and the derived numbers such as AC, spell DC, and attack bonuses are calculated from it rather than hardcoded.
+
+## Levelling up
+
+`BLOOD_HUNTER_LEVEL` and `WIZARD_LEVEL`, declared just above `CHAR`, are the single source of truth for anything that scales with level.
+Character level, proficiency bonus, the hit dice pools, Bladesong uses, and Arcane Recovery are all computed from them.
+
+So a level-up is: bump the class level, add the rolled hit points to `hp.baseHpFromDice` and `hp.current`, add any new spells and features, and adjust the spell slot counts.
+The Combat tab's attack routine computes itself from whatever toggles are active, so damage numbers never need updating by hand.
