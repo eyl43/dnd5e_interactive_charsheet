@@ -39,18 +39,30 @@ const MAGIC_ITEM_EFFECTS = {
   "Amulet of Health": { CON: { type: "set", value: 19 } },
 };
 
+// Class levels are the single source of truth for everything that scales with level.
+// Levelling up should mean editing these two numbers and the hit points rolled for it.
+const BLOOD_HUNTER_LEVEL = 7;
+const WIZARD_LEVEL = 7;
+const CHARACTER_LEVEL = BLOOD_HUNTER_LEVEL + WIZARD_LEVEL;
+const PROF_BONUS = Math.ceil(CHARACTER_LEVEL / 4) + 1;
+const HIT_DICE = { d8: BLOOD_HUNTER_LEVEL, d6: WIZARD_LEVEL }; // Blood Hunter d8, Wizard d6
+// Arcane Recovery returns slot levels equal to half your wizard level, rounded up.
+const ARCANE_RECOVERY_LEVELS = Math.ceil(WIZARD_LEVEL / 2);
+// Bladesong: uses equal to your proficiency bonus, regained on a long rest.
+const BLADESONG_USES = PROF_BONUS;
+
 const CHAR = {
   name: "Dr. Lucien Harrow",
   race: "Custom Lineage",
-  classes: "Blood Hunter (Mutant) 7 / Bladesinger Wizard 5",
-  level: 12,
+  classes: `Blood Hunter (Mutant) ${BLOOD_HUNTER_LEVEL} / Bladesinger Wizard ${WIZARD_LEVEL}`,
+  level: CHARACTER_LEVEL,
   background: "Sage",
   alignment: "Chaotic Good",
-  profBonus: 4,
+  profBonus: PROF_BONUS,
   // Max HP is derived (baseHpFromDice + CON mod x level), so it tracks the Amulet of
   // Health and any mutagens. 99 assumes the amulet is attuned, which is the default.
-  hp: { max: 99, baseHpFromDice: 51, current: 99, temp: 0 },
-  hitDice: "7d8 + 5d6",
+  hp: { max: 115, baseHpFromDice: 59, current: 115, temp: 0 },
+  hitDice: `${HIT_DICE.d8}d8 + ${HIT_DICE.d6}d6`,
   hemocraftDie: "1d6",
   speed: 30,
   stats: {
@@ -172,7 +184,7 @@ const CHAR = {
       ],
     },
     "3rd": {
-      slots: 2,
+      slots: 3,
       list: [
         {
           name: "Haste", action: "Action", ritual: false, conc: true,
@@ -215,7 +227,7 @@ const CHAR = {
     { name: "Strange Metabolism",     source: "Mutant Order 7",     action: "Bonus",    desc: "You gain immunity to poison damage and the poisoned condition. Additionally, once per long rest you can use a bonus action to ignore the side effect of one mutagen affecting you for 1 minute. You can concoct 2 mutagens per rest and know 5 formulas at this level." },
     { name: "Blood Curse of the Fallen Puppet", source: "Blood Hunter 7", action: "Reaction", desc: "Reaction: when a creature you can see drops to 0 HP, force it to immediately make one melee weapon attack against a target of your choice. Amplify: the creature also moves up to half its speed before attacking, and gains a bonus to the attack roll equal to your INT modifier (+4 or +5)." },
     // ── Character Level 8 (Wizard 1) ──────────────────────────────
-    { name: "Arcane Recovery",        source: "Wizard 1",           action: "Special",  desc: "Once per day when you finish a short rest, recover expended spell slots with a combined level of up to half your Wizard level (rounded up). Slots recovered: up to 3 levels total (e.g. one 3rd-level, or one 2nd + one 1st)." },
+    { name: "Arcane Recovery",        source: "Wizard 1",           action: "Special",  desc: `Once per day when you finish a short rest, recover expended spell slots with a combined level of up to half your Wizard level (rounded up). Slots recovered: up to ${ARCANE_RECOVERY_LEVELS} levels total (e.g. one 4th-level, or one 3rd + one 1st).` },
     // ── Character Level 9 (Wizard 2 — Bladesinger) ────────────────
     { name: "Bladesong",              source: "Bladesinger 2",      action: "Bonus",    desc: "Bonus action: begin the Bladesong for 1 minute. While active: +INT modifier to AC (already reflected above when toggled), +10 ft speed, advantage on Acrobatics checks, and +INT modifier to concentration saving throws. Ends early if you don armor, are incapacitated, or use two hands to make an attack. 4 uses per long rest." },
   ],
@@ -483,14 +495,14 @@ export default function CharacterSheet() {
   const [exhaustion, setExhaustion] = usePersistentState("exhaustion", 0);
   const [concentration, setConcentration] = usePersistentState("concentration", { active: false, spell: "" });
   const [deathSaves, setDeathSaves] = usePersistentState("deathSaves", { successes: 0, failures: 0 });
-  const [hitDice, setHitDice] = usePersistentState("hitDice", { d8: 7, d6: 5 });
+  const [hitDice, setHitDice] = usePersistentState("hitDice", { ...HIT_DICE });
   const [arcaneRecoveryUsed, setArcaneRecoveryUsed] = usePersistentState("arcaneRecoveryUsed", false);
   const [tab, setTab] = useState("combat");
   const [spellSlots, setSpellSlots] = usePersistentState(
     "spellSlots",
     Object.fromEntries(Object.entries(CHAR.spells).map(([lvl, d]) => [lvl, d.slots]))
   );
-  const [bladesongUsesLeft, setBladesongUsesLeft] = usePersistentState("bladesongUses", 4);
+  const [bladesongUsesLeft, setBladesongUsesLeft] = usePersistentState("bladesongUses", BLADESONG_USES);
   const [mutageNDoses, setMutageNDoses] = usePersistentState("mutagenDoses", 4);
   const [lore, setLore] = usePersistentState("lore", {
     history: "Dr. Lucien Harrow had, for most of his life, known that he was the prime example for why certain rules and regulations were written. However, his widespread research success and influence on politics and academic funding encouraged officials and deans alike to turn a blind eye to blatant violations of safety and code of conduct. Currently at the height of his career, he holds a senior position at the Thalmurian Institute of Magic, where he is renowned for breakthroughs in applied arcanotech, battlefield thaumaturgy, and most recently amplified moonglow. His patents single handedly funded great portions of the city watch and private consortium research. His grants filled university coffers, encouraging academic tourism from across the continent.  His famously dry, unenthusiastic lectures on inventions of generational importance packed auditoriums and encouraged the construction of two separate expansions for standing-room only attendees. Although scholars who attended were often left confused as to whether they had been instructed or insulted, all were eager to return for greater insight into the professor’s work. The university, as a result, had no choice but to turn a blind eye to what board members found to be distasteful, ethically indefensible, yet incredibly profitable methods. Harrow’s reputation as the premier Thalmurian tracker was stranger still. Inside the city, he was also considered the foremost living authority on pursuit of beasts, fugitives, the occult, and, more often than not, people. He possessed an unnerving intelligence and a talent for deduction. Many of his coworkers often admitted that conversations with Harrow often felt more like dissections. When the noble houses or city government wanted problems solved without a public spectacle, Harrow was the man for the job. He always accepted, as long as the suspect could be ‘harvested’ for research. The city constables often ignored missing organs from the deceased. Harrow’s graduate students knew him as a tyrant of perfection.He was wholly uninterested in morale, and was well known for graduating only 10% of the students who entered his lab.Nobody ever left his tutelage completely intact, in either the physical, magical, or mental sense.Public morality was a cute theater for the professor, and political office to be elaborate mechanisms of control for which there were far more direct solutions.Yet despite his unyielding personality, many were still hungry for every word that the professor would offer.Perhaps he only considered his peers, which there were precious few, to be worth his time and consideration. Very little is known about Harrow’s formative years before the university.It is known that he began as a graduate student at the Thalmurian Institute directly after serving as an imperial architecti in the first Thalmurian- Mageocracy conflict.However, the history books are crystal clear about the accounts of widespread cruelty inflicted by the Mageocracy on and off the battlefield.Rumors mention that Harrow perfected his hemocracy here on the blood - rich battlefields.It is one of the few research discoveries that he has kept to himself.His success in the university and field have made him a legendary fighter.Despite his contempt for hubris, some of his graduate students have whispered that Harrow proudly displays a clipping of the bounty the Mageocracy has placed on his head.But it seems he feels no pride in his talents. *When something flees beneath the ground, they call the doctor when they want it found.*",
@@ -741,12 +753,12 @@ export default function CharacterSheet() {
   const longRest = () => {
     // 5e: regain hit dice equal to half your level, your choice of which. Bigger dice first.
     const diceBack = Math.max(1, Math.floor(CHAR.level / 2));
-    const d8Back = Math.min(7 - hitDice.d8, diceBack);
-    const d6Back = Math.min(5 - hitDice.d6, diceBack - d8Back);
+    const d8Back = Math.min(HIT_DICE.d8 - hitDice.d8, diceBack);
+    const d6Back = Math.min(HIT_DICE.d6 - hitDice.d6, diceBack - d8Back);
     setHitDice({ d8: hitDice.d8 + d8Back, d6: hitDice.d6 + d6Back });
 
     setSpellSlots(fullSlots());
-    setBladesongUsesLeft(4);
+    setBladesongUsesLeft(BLADESONG_USES);
     setMutageNDoses(4);
     setBloodCurseUses(BLOOD_MALEDICT_USES);
     setArcaneRecoveryUsed(false);
@@ -797,7 +809,7 @@ export default function CharacterSheet() {
             <Sigil size={72} active={bladesongActive} />
           </div>
           <div style={{ fontSize: 9, letterSpacing: 6, color: "#8b1c1c", textTransform: "uppercase", fontFamily: "'Cinzel', serif", marginBottom: 8 }}>
-            Blood Hunter Mutant 7 · Bladesinger Wizard 5
+            Blood Hunter Mutant {BLOOD_HUNTER_LEVEL} · Bladesinger Wizard {WIZARD_LEVEL}
           </div>
           <h1 style={{
             fontSize: 36, fontFamily: "'Cinzel', serif", fontWeight: 900, color: "#e8dcc4",
@@ -807,7 +819,7 @@ export default function CharacterSheet() {
             {CHAR.name}
           </h1>
           <div style={{ fontSize: 13, color: "#d4a82a", fontFamily: "'Cinzel', serif", letterSpacing: 2, marginTop: 4 }}>
-            Custom Lineage · Level 12 · Feat: Gunner
+            Custom Lineage · Level {CHARACTER_LEVEL} · Feat: Gunner
           </div>
           <div style={{ width: 60, height: 1, background: "linear-gradient(90deg, transparent, #8b1c1c, transparent)", margin: "16px auto 0" }} />
           <div className="cs-no-print" style={{ marginTop: 14, display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
@@ -1076,7 +1088,7 @@ export default function CharacterSheet() {
         <div style={{ display: "flex", gap: 24, justifyContent: "center", flexWrap: "wrap", marginBottom: 20, padding: "10px 16px", background: "rgba(20,16,14,0.4)", border: "1px solid rgba(139,28,28,0.15)", borderRadius: 3 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 9, letterSpacing: 2, color: "#a0b8e8", textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>Bladesong</span>
-            <PipTracker total={4} remaining={bladesongUsesLeft} onSet={setBladesongUsesLeft} color="#a0b8e8" />
+            <PipTracker total={BLADESONG_USES} remaining={bladesongUsesLeft} onSet={setBladesongUsesLeft} color="#a0b8e8" />
           </div>
           <div style={{ width: 1, background: "rgba(139,28,28,0.2)", alignSelf: "stretch" }} />
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
@@ -1220,11 +1232,11 @@ export default function CharacterSheet() {
               <span style={{ fontSize: 9, letterSpacing: 2, color: "#9a8060", textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>Hit Dice</span>
               <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <span style={{ fontFamily: "'Fira Code', monospace", fontSize: 10, color: "#7a6a56" }}>d8</span>
-                <PipTracker total={7} remaining={hitDice.d8} onSet={(v) => setHitDice(prev => ({ ...prev, d8: v }))} color="#c4a030" />
+                <PipTracker total={HIT_DICE.d8} remaining={hitDice.d8} onSet={(v) => setHitDice(prev => ({ ...prev, d8: v }))} color="#c4a030" />
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <span style={{ fontFamily: "'Fira Code', monospace", fontSize: 10, color: "#7a6a56" }}>d6</span>
-                <PipTracker total={5} remaining={hitDice.d6} onSet={(v) => setHitDice(prev => ({ ...prev, d6: v }))} color="#8ab4d8" />
+                <PipTracker total={HIT_DICE.d6} remaining={hitDice.d6} onSet={(v) => setHitDice(prev => ({ ...prev, d6: v }))} color="#8ab4d8" />
               </div>
             </div>
           </div>
@@ -1703,7 +1715,7 @@ export default function CharacterSheet() {
                 fontSize: 10, letterSpacing: 2, textTransform: "uppercase", fontFamily: "'Cinzel', serif",
                 color: arcaneRecoveryUsed ? "#7a6a56" : "#80d8c8", flex: 1,
               }}>
-                Arcane Recovery - up to 3 slot levels back on a short rest
+                Arcane Recovery - up to {ARCANE_RECOVERY_LEVELS} slot levels back on a short rest
               </span>
               <button
                 className="cs-btn"
@@ -2194,7 +2206,7 @@ export default function CharacterSheet() {
           textAlign: "center", fontSize: 9, letterSpacing: 3, color: "#44362a",
           fontFamily: "'Cinzel', serif", textTransform: "uppercase",
         }}>
-          A Hunter Must Hunt · Blood Hunter 7 / Bladesinger 5
+          A Hunter Must Hunt · Blood Hunter {BLOOD_HUNTER_LEVEL} / Bladesinger {WIZARD_LEVEL}
         </div>
       </div>
     </div>

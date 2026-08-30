@@ -38,13 +38,13 @@ try {
   }
 
   // The Amulet of Health is attuned by default, so CON reads 19 (not its base 14)
-  // and max HP is 51 + 4x12 = 99 on the very first load.
+  // and max HP is 59 + 4x14 = 115 on the very first load.
   const conRaised = /CON<\/span>[\s\S]{0,400}?>19</.test(html);
   if (!conRaised) failures++;
   console.log(`${conRaised ? "PASS" : "FAIL"}  amulet raises CON to 19 by default`);
-  const maxHp = /\/ (<!-- -->)?99/.test(html);
+  const maxHp = /\/ (<!-- -->)?115/.test(html);
   if (!maxHp) failures++;
-  console.log(`${maxHp ? "PASS" : "FAIL"}  max HP is 99 with the amulet attuned`);
+  console.log(`${maxHp ? "PASS" : "FAIL"}  max HP is 115 with the amulet attuned`);
 
   // Death saves and the concentration prompt are conditional - they must NOT be
   // in the initial render (full HP, not concentrating).
