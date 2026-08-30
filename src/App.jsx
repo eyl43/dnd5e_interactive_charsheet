@@ -1832,17 +1832,77 @@ export default function CharacterSheet() {
               </div>
             </Section>
 
-            <Section title="Nova Round Breakdown">
-              <div style={{ padding: "12px", background: "rgba(139,28,28,0.08)", border: "1px solid rgba(139,28,28,0.2)", borderRadius: 3, fontSize: 13, lineHeight: 1.8, color: "#a89070" }}>
-                <div style={{ color: "#d4a82a", fontFamily: "'Cinzel', serif", fontSize: 10, letterSpacing: 2, marginBottom: 6 }}>
-                  FULL BUFF — BLADESONG + HASTE + CELERITY + SAGACITY + ELDRITCH MAUL
-                </div>
-                3 attacks (Extra Attack + Haste)<br />
-                Each: 1d8+7 slashing + 1d6 rite + 1d6 force (Maul)<br />
-                Hit bonus: +10 | AC: 25 base / 30 w/ Shield<br />
-                Avg damage/round: ~58.5 (three hits)<br />
-                <span style={{ color: "#9a8060", fontStyle: "italic" }}>+ Reach 15ft during Eldritch Maul activation</span>
-              </div>
+            <Section title="Attack Routine" accent="#d4a82a">
+              {(() => {
+                // Everything here reads the live toggles, so the numbers cannot go stale.
+                const atkBonus = dexMod + CHAR.profBonus;
+                const dmgMod   = dexMod + 2; // Dueling
+                const die      = whipForm ? "1d4" : "1d8";
+                const dieAvg   = whipForm ? 2.5 : 4.5;
+                const reach    = (whipForm ? 10 : 5) + (tattooMaulActive ? 5 : 0);
+                const attacks  = 2 + (hasteActive ? 1 : 0); // Extra Attack, plus Haste's extra action
+                // Booming Blade scales at 11th level: 2d8 on hit, 3d8 if the target moves.
+                const boomOnHit = 9;    // 2d8
+                const boomOnMove = 13.5; // 3d8
+                const perAttack = dieAvg + dmgMod + 3.5 + (tattooMaulActive ? 3.5 : 0);
+                const roundAvg  = attacks * perAttack + boomOnHit;
+
+                const weaponLine = (
+                  <>
+                    {die} + {dmgMod} slashing
+                    <span style={{ color: "#8a7864" }}> + 1d6 rite</span>
+                    {tattooMaulActive && <span style={{ color: "#d4a82a" }}> + 1d6 force</span>}
+                  </>
+                );
+                const rowStyle = { display: "grid", gridTemplateColumns: "84px 1fr", gap: "6px 12px", alignItems: "baseline" };
+                const tagStyle = { fontSize: 9, letterSpacing: 1, textTransform: "uppercase", fontFamily: "'Cinzel', serif", color: "#d4a82a" };
+
+                return (
+                  <div style={{ padding: "12px", background: "rgba(139,28,28,0.08)", border: "1px solid rgba(139,28,28,0.2)", borderRadius: 3, fontSize: 13, color: "#a89070" }}>
+                    <div style={{ ...rowStyle, fontFamily: "'Fira Code', monospace", lineHeight: 1.6 }}>
+                      <span style={tagStyle}>Action</span>
+                      <div>
+                        <div style={{ color: "#c4b49a" }}>
+                          <span style={{ color: "#e8dcc4" }}>Booming Blade</span> - {weaponLine}
+                          <span style={{ color: "#a0c0ff" }}> + 2d8 thunder</span>
+                        </div>
+                        <div style={{ color: "#c4b49a" }}>
+                          <span style={{ color: "#e8dcc4" }}>Weapon attack</span> - {weaponLine}
+                        </div>
+                      </div>
+
+                      {hasteActive && (
+                        <>
+                          <span style={{ ...tagStyle, color: "#ffd08a" }}>Haste</span>
+                          <div style={{ color: "#c4b49a" }}>
+                            <span style={{ color: "#e8dcc4" }}>Weapon attack</span> - {weaponLine}
+                          </div>
+                        </>
+                      )}
+
+                      <span style={tagStyle}>To hit</span>
+                      <span style={{ color: "#e8dcc4" }}>
+                        {formatMod(atkBonus)}
+                        {greaterInvisActive && <span style={{ color: "#d8b8ff" }}> with advantage</span>}
+                        <span style={{ color: "#8a7864" }}>{`  ·  reach ${reach} ft`}</span>
+                      </span>
+
+                      <span style={tagStyle}>Average</span>
+                      <span style={{ color: "#e8dcc4", fontSize: 15 }}>
+                        {`~${roundAvg.toFixed(1)} per round`}
+                        <span style={{ color: "#8a7864", fontSize: 12 }}>{` across ${attacks} attacks, all hitting`}</span>
+                      </span>
+                    </div>
+
+                    <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid rgba(139,28,28,0.15)", fontSize: 11, lineHeight: 1.7, color: "#8a7864", fontStyle: "italic" }}>
+                      <div>{`Booming Blade adds another 3d8 thunder (~${boomOnMove}) if the target then moves willingly.`}</div>
+                      <div>{`Green-Flame Blade instead: 2d8 fire on the target, and ${formatMod(intMod)} + 2d8 fire leaps to a second creature within 5 ft.`}</div>
+                      {!hasteActive && <div>Haste would add a third attack.</div>}
+                      {!tattooMaulActive && <div>Eldritch Maul would add 1d6 force to every hit and 5 ft of reach.</div>}
+                    </div>
+                  </div>
+                );
+              })()}
             </Section>
 
           </div>

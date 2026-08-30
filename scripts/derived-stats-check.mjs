@@ -98,6 +98,28 @@ try {
   html = render();
   check("whip plus maul reaches 15 ft", /15(<!-- -->)? ft/.test(html));
 
+  // Attack routine, computed live. Scythe 1d8 (avg 4.5) + 8 damage mod (DEX 6 + Dueling 2)
+  // + 1d6 rite (3.5) = 16 per attack, two attacks, plus 2d8 (9) from Booming Blade = 41.
+  seed({});
+  html = render();
+  check("routine averages 41.0 unbuffed", html.includes("~41.0 per round"));
+  check("routine counts 2 attacks unbuffed", html.includes("across 2 attacks"));
+  check("routine names Booming Blade", html.includes("Booming Blade"));
+  check("routine offers Haste as an upgrade", html.includes("Haste would add a third attack"));
+
+  // Haste adds a third attack, Maul adds 1d6 force (3.5) to each: 3 x 19.5 + 9 = 67.5.
+  seed({ hasteActive: true, tattooMaulActive: true });
+  html = render();
+  check("routine averages 67.5 with Haste and Maul", html.includes("~67.5 per round"));
+  check("routine counts 3 attacks with Haste", html.includes("across 3 attacks"));
+  check("routine drops the Haste suggestion once active", !html.includes("Haste would add a third attack"));
+
+  // Whip form trades the d8 for a d4: 3 x 17.5 + 9 = 61.5, at 15 ft with Maul.
+  seed({ hasteActive: true, tattooMaulActive: true, whipForm: true });
+  html = render();
+  check("routine averages 61.5 in whip form", html.includes("~61.5 per round"));
+  check("routine reports 15 ft reach in whip form with Maul", html.includes("reach 15 ft"));
+
   // Greater Invisibility takes concentration, so switching it on ends Haste, and it
   // marks advantage on both weapon attack lines.
   seed({ greaterInvisActive: true });
