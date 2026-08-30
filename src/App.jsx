@@ -206,6 +206,31 @@ const CHAR = {
           desc: "8d6 fire in 20-ft radius, DEX save for half — spreads around corners",
           fullDesc: "Cast time: 1 action · Range: 150 ft · Duration: Instantaneous\nComponents: V, S, M (a tiny ball of bat guano and sulfur)\n\nA bright streak flashes to a point you choose within range and blossoms into a 20-ft radius sphere of roaring flame. Each creature in the sphere makes a DEX saving throw (DC {dc}):\n· Failed save: 8d6 fire damage (avg ~28)\n· Successful save: half damage\n\nThe fire spreads around corners. Nonmagical flammable objects that are not worn or carried are ignited. A solid obstruction (wall, pillar) can block the spread in that direction.",
         },
+        {
+          name: "Dispel Magic", action: "Action", ritual: false,
+          desc: "End spells of 3rd level or lower automatically; INT check vs DC 10 + level for higher",
+          fullDesc: "Cast time: 1 action · Range: 120 ft · Duration: Instantaneous\nComponents: V, S\n\nChoose one creature, object, or magical effect within range. Any spell of 3rd level or lower on the target ends.\n\nFor a spell of 4th level or higher, make a spellcasting ability check (INT, {spellAtk} without proficiency doubling) against DC 10 + the spell's level. On a success, the spell ends.\n\nCasting at a higher level: you automatically end spells up to the level of the slot used. With your one 4th-level slot, that covers 4th-level effects with no roll.",
+        },
+        {
+          name: "Thunder Step", action: "Action", ritual: false,
+          desc: "Teleport 90 ft; 3d10 thunder in a 10-ft radius at the space you left, CON save for half",
+          fullDesc: "Cast time: 1 action · Range: Self · Duration: Instantaneous\nComponents: V\n\nYou teleport yourself to an unoccupied space you can see within 90 ft. Immediately before you go, thunder cracks at your origin point: each creature within 10 ft of the space you left makes a CON saving throw (DC {dc}), taking 3d10 thunder damage on a failure, half as much on a success.\n\nYou can bring one willing creature you are touching along with you, teleporting it to an unoccupied space of your choice within 5 ft of your destination.\n\nThe thunder is audible out to 300 ft. No concentration, and only a verbal component, so it works while grappled or restrained.",
+        },
+      ],
+    },
+    "4th": {
+      slots: 1,
+      list: [
+        {
+          name: "Greater Invisibility", action: "Action", ritual: false, conc: true,
+          desc: "Concentration, 1 min: fully invisible — advantage on your attacks, disadvantage on theirs",
+          fullDesc: "Cast time: 1 action · Range: Touch · Duration: 1 minute (concentration)\nComponents: V, S\n\nYou or a creature you touch becomes invisible until the spell ends. Anything the target is wearing or carrying is invisible as long as it is on the target's person.\n\nUnlike Invisibility, this does not end when you attack or cast a spell. For the full minute:\n· Your attack rolls have advantage\n· Attack rolls against you have disadvantage\n· You cannot be targeted by anything requiring sight\n\nNote: creatures can still find you by other means. You are not silent, and a creature can guess your square and attack it. Truesight, blindsight, tremorsense and See Invisibility all defeat it.\n\nCompetes with Haste for your concentration, and with Fire Shield for your single 4th-level slot.",
+        },
+        {
+          name: "Fire Shield", action: "Action", ritual: false,
+          desc: "10 min, no concentration: resistance to cold or fire, and 2d8 back at melee attackers",
+          fullDesc: "Cast time: 1 action · Range: Self · Duration: 10 minutes\nComponents: V, S, M (a bit of phosphorus or a firefly)\n\nThin flames wreathe you, shedding bright light in a 10-ft radius and dim light for another 10 ft. You can end the spell early with an action. Choose one form when you cast it:\n\n· Warm shield — resistance to COLD damage. Attackers take 2d8 fire.\n· Chill shield — resistance to FIRE damage. Attackers take 2d8 cold.\n\nWhenever a creature within 5 ft hits you with a melee attack, the shield erupts and deals 2d8 damage of the shield's type to it.\n\nNo concentration, so this runs alongside Haste, Bladesong or a Crimson Rite without conflict. It is the only sustained damage resistance you have outside a mutagen.",
+        },
       ],
     },
   },
