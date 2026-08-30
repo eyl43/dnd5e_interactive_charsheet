@@ -79,6 +79,18 @@ Turning Haste on sets your concentration to Haste, and losing concentration drop
 Order of operations for speed: the Bladesong bonus applies first, then Haste doubles the total, then exhaustion halves it.
 So Bladesong plus Haste is (30 + 10) x 2 = 80 ft.
 
+## Weapon forms
+
+The Scythe Whip card has a Scythe / Whip toggle, since transforming it is a bonus action you take mid-fight.
+Scythe form is 1d8 at 5 ft, whip form is 1d4 at 10 ft, and Eldritch Maul adds 5 ft on top of whichever form is active.
+The card always shows the active form's damage and reach up top, with the other form listed below so you can see the trade before you switch.
+
+## Always-visible panels
+
+Skills sit above the tab bar rather than inside the Combat tab, so they stay readable whichever tab you are on.
+The same is true of HP, the buff toggles, the stat blocks, quick stats, and the status panel.
+Only weapons, spells, features, gear, and lore are behind tabs.
+
 ## Rests
 
 **Short Rest** ends Bladesong, Shield, and concentration, and restores both Blood Maledict uses.

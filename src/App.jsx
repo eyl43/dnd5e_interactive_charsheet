@@ -434,6 +434,7 @@ export default function CharacterSheet() {
   const [tattooMaulActive, setTattooMaulActive] = usePersistentState("tattooMaulActive", false);
   const [shieldActive, setShieldActive] = usePersistentState("shieldActive", false);
   const [hasteActive, setHasteActive] = usePersistentState("hasteActive", false);
+  const [whipForm, setWhipForm] = usePersistentState("whipForm", false);
   const [bulletCount, setBulletCount] = usePersistentState("bullets", 0);
   const [bloodCurseUses, setBloodCurseUses] = usePersistentState("bloodCurseUses", BLOOD_MALEDICT_USES);
   const [expandedSpells, setExpandedSpells] = useState(new Set());
@@ -1015,7 +1016,7 @@ export default function CharacterSheet() {
             </div>
             {/* Dice reference */}
             <div style={{ textAlign: "center", borderLeft: "1px solid rgba(139,28,28,0.2)", paddingLeft: 20 }}>
-              <div style={{ fontSize: 9, letterSpacing: 2, color: "#8b1c1c", textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>Hemocraft Die</div>
+              <div style={{ fontSize: 9, letterSpacing: 2, color: "#e8604a", textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>Hemocraft Die</div>
               <div style={{ fontSize: 13, color: "#c4b49a", fontFamily: "'Fira Code', monospace", marginTop: 1 }}>{CHAR.hemocraftDie}</div>
             </div>
           </div>
@@ -1121,6 +1122,41 @@ export default function CharacterSheet() {
               <div style={{ fontSize: 14, color: s.shield ? "#ddeeff" : s.haste ? "#ffd08a" : s.song ? "#c8d8ff" : "#e8dcc4", fontFamily: "'Fira Code', monospace", marginTop: 2 }}>{s.value}</div>
             </div>
           ))}
+        </div>
+
+        {/* Skills - kept above the tabs so they stay reachable from every tab */}
+        <div className="cs-card" style={{
+          marginBottom: 20, padding: "12px 14px", background: "rgba(20,16,14,0.4)",
+          border: "1px solid rgba(139,28,28,0.15)", borderRadius: 3,
+        }}>
+          <div style={{
+            fontSize: 11, letterSpacing: 3, textTransform: "uppercase", color: "#8b1c1c",
+            fontFamily: "'Cinzel', serif", fontWeight: 700, marginBottom: 10,
+            borderBottom: "1px solid rgba(139,28,28,0.4)", paddingBottom: 6,
+          }}>Skills</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "2px 16px", fontSize: 12 }}>
+            {CHAR.skills.map((s, i) => {
+              const effMod = getEffectiveMod(s.stat);
+              const total  = s.prof ? effMod + CHAR.profBonus : effMod;
+              const changed = getMutStatBonus(s.stat) !== 0;
+              const songAdv = bladesongActive && s.name === "Acrobatics";
+              return (
+                <div key={i} style={{
+                  display: "flex", justifyContent: "space-between", padding: "3px 4px",
+                  color: songAdv ? "#c8d8ff" : s.prof ? "#c4b49a" : "#9a8060",
+                  borderBottom: "1px solid rgba(139,28,28,0.07)",
+                  background: songAdv ? "rgba(80,120,200,0.08)" : undefined,
+                }}>
+                  <span>
+                    {s.prof ? "★ " : "  "}{s.name}{" "}
+                    <span style={{ fontSize: 9, color: "#7a6a56" }}>({s.stat})</span>
+                    {songAdv && <span style={{ fontSize: 9, color: "rgba(140,180,255,0.8)", marginLeft: 4 }}>ADV ♪</span>}
+                  </span>
+                  <span style={{ fontFamily: "'Fira Code', monospace", color: changed ? "#c45c3e" : songAdv ? "#c8d8ff" : s.prof ? "#c4b49a" : "#9a8060" }}>{formatMod(total)}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* Conditions, concentration, exhaustion */}
@@ -1334,6 +1370,25 @@ export default function CharacterSheet() {
                 const dmgMod   = dexMod + 2; // Dueling +2
                 const lbl = { fontSize: 9, letterSpacing: 1, color: "#d4a82a", textTransform: "uppercase", fontFamily: "'Cinzel', serif", alignSelf: "center" };
                 const subLbl = { ...lbl, color: "#9a8060" };
+                // Whip form trades the d8 for a d4 and adds 5 ft of reach.
+                const die   = whipForm ? "1d4" : "1d8";
+                const reach = (whipForm ? 10 : 5) + (tattooMaulActive ? 5 : 0);
+                const formButton = (label, active, onClick) => (
+                  <button
+                    className="cs-btn"
+                    onClick={onClick}
+                    aria-pressed={active}
+                    style={{
+                      background: active
+                        ? "linear-gradient(180deg, rgba(139,28,28,0.5), rgba(139,28,28,0.2))"
+                        : "rgba(20,16,14,0.5)",
+                      border: `1px solid ${active ? "#8b1c1c" : "#3a2e24"}`,
+                      color: active ? "#e8dcc4" : "#9a8060",
+                      fontFamily: "'Cinzel', serif", fontSize: 9, letterSpacing: 2,
+                      textTransform: "uppercase", padding: "4px 12px", borderRadius: 2,
+                    }}
+                  >{label}</button>
+                );
                 return (
                   <div style={{
                     padding: "12px", marginBottom: 8,
@@ -1341,9 +1396,20 @@ export default function CharacterSheet() {
                     border: `1px solid ${tattooMaulActive ? "rgba(212,168,42,0.35)" : "rgba(139,28,28,0.15)"}`,
                     borderRadius: 3, transition: "border-color 0.25s",
                   }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                      <span style={{ fontFamily: "'Cinzel', serif", color: "#e8dcc4", fontSize: 14 }}>Scythe Whip (HB)</span>
-                      {tattooMaulActive && <span style={{ fontSize: 9, letterSpacing: 2, color: "#d4a82a", fontFamily: "'Cinzel', serif", textTransform: "uppercase" }}>◆ Eldritch Maul</span>}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+                      <span style={{ fontFamily: "'Cinzel', serif", color: "#e8dcc4", fontSize: 14 }}>
+                        Scythe Whip (HB)
+                        <span style={{ color: "#9a8060", fontSize: 11, marginLeft: 8 }}>
+                          {whipForm ? "whip form" : "scythe form"}
+                        </span>
+                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        {tattooMaulActive && <span style={{ fontSize: 9, letterSpacing: 2, color: "#d4a82a", fontFamily: "'Cinzel', serif", textTransform: "uppercase" }}>◆ Eldritch Maul</span>}
+                        <div className="cs-no-print" style={{ display: "flex", gap: 4 }}>
+                          {formButton("⚔ Scythe", !whipForm, () => setWhipForm(false))}
+                          {formButton("⌇ Whip", whipForm, () => setWhipForm(true))}
+                        </div>
+                      </div>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "72px 1fr", gap: "7px 12px", fontSize: 12, marginBottom: 10 }}>
                       <span style={lbl}>Attack</span>
@@ -1351,13 +1417,22 @@ export default function CharacterSheet() {
 
                       <span style={lbl}>Damage</span>
                       <div style={{ fontFamily: "'Fira Code', monospace", lineHeight: 1.65 }}>
-                        <div style={{ color: "#c4b49a" }}>1d8 + {dmgMod} slashing</div>
-                        <div style={{ color: "#c4b49a" }}>+ 1d6 cold / lightning <span style={{ color: "#8b1c1c", fontSize: 10 }}>(Crimson Rite)</span></div>
+                        <div style={{ color: "#e8dcc4", fontSize: 14 }}>{die} + {dmgMod} slashing</div>
+                        <div style={{ color: "#c4b49a" }}>+ 1d6 cold / lightning <span style={{ color: "#c9453a", fontSize: 10 }}>(Crimson Rite)</span></div>
                         {tattooMaulActive && <div style={{ color: "#d4a82a" }}>+ 1d6 force <span style={{ color: "#9a8060", fontSize: 10 }}>(Eldritch Maul)</span></div>}
                       </div>
 
-                      <span style={subLbl}>Whip Form</span>
-                      <span style={{ fontFamily: "'Fira Code', monospace", color: "#a89070" }}>1d4 + {dmgMod} slashing · +5ft reach{tattooMaulActive ? " (+5 Maul = 15ft)" : ""}</span>
+                      <span style={lbl}>Reach</span>
+                      <span style={{ fontFamily: "'Fira Code', monospace", color: whipForm || tattooMaulActive ? "#d4a82a" : "#c4b49a" }}>
+                        {reach} ft
+                        {whipForm && <span style={{ color: "#9a8060", fontSize: 10 }}> (+5 whip)</span>}
+                        {tattooMaulActive && <span style={{ color: "#9a8060", fontSize: 10 }}> (+5 maul)</span>}
+                      </span>
+
+                      <span style={subLbl}>{whipForm ? "Scythe Form" : "Whip Form"}</span>
+                      <span style={{ fontFamily: "'Fira Code', monospace", color: "#8a7864" }}>
+                        {whipForm ? "1d8" : "1d4"} + {dmgMod} slashing · {(whipForm ? 5 : 10) + (tattooMaulActive ? 5 : 0)} ft reach
+                      </span>
                     </div>
                     <div style={{ fontSize: 11, color: "#8a7864", fontStyle: "italic", borderTop: "1px solid rgba(139,28,28,0.1)", paddingTop: 6 }}>
                       Finesse · Dueling +2 included · Bonus action: transform form
@@ -1455,31 +1530,6 @@ export default function CharacterSheet() {
               </div>
             </Section>
 
-            <Section title="Skills">
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 16px", fontSize: 12 }}>
-                {CHAR.skills.map((s, i) => {
-                  const effMod = getEffectiveMod(s.stat);
-                  const total  = s.prof ? effMod + CHAR.profBonus : effMod;
-                  const changed = getMutStatBonus(s.stat) !== 0;
-                  const songAdv = bladesongActive && s.name === "Acrobatics";
-                  return (
-                    <div key={i} style={{
-                      display: "flex", justifyContent: "space-between", padding: "3px 4px",
-                      color: songAdv ? "#c8d8ff" : s.prof ? "#c4b49a" : "#9a8060",
-                      borderBottom: "1px solid rgba(139,28,28,0.07)",
-                      background: songAdv ? "rgba(80,120,200,0.08)" : undefined,
-                    }}>
-                      <span>
-                        {s.prof ? "★ " : "  "}{s.name}{" "}
-                        <span style={{ fontSize: 9, color: "#7a6a56" }}>({s.stat})</span>
-                        {songAdv && <span style={{ fontSize: 9, color: "rgba(140,180,255,0.8)", marginLeft: 4 }}>ADV ♪</span>}
-                      </span>
-                      <span style={{ fontFamily: "'Fira Code', monospace", color: changed ? "#c45c3e" : songAdv ? "#c8d8ff" : s.prof ? "#c4b49a" : "#9a8060" }}>{formatMod(total)}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </Section>
           </div>
         )}
 

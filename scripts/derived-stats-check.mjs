@@ -1,5 +1,6 @@
-// Renders the sheet with Haste (and friends) already active, to confirm the derived
-// numbers - AC, speed, DEX save advantage - come out right.
+// Renders the sheet with buffs and weapon forms already active, to confirm the
+// derived numbers - AC, speed, DEX save advantage, weapon damage and reach - come
+// out right.
 import { createServer } from "vite";
 import { renderToString } from "react-dom/server";
 import { createElement } from "react";
@@ -66,6 +67,34 @@ try {
   seed({ hasteActive: true, concentration: { active: true, spell: "Haste" } });
   html = render();
   check("Haste occupies concentration", html.includes('value="Haste"'));
+
+  // Scythe form: 1d8 + 8 (DEX 22 with Celerity, +2 Dueling) at 5 ft.
+  seed({});
+  html = render();
+  check("scythe form rolls 1d8", /1d8[\s\S]{0,40}?8[\s\S]{0,40}?slashing/.test(html));
+  check("scythe form reaches 5 ft", /5(<!-- -->)? ft/.test(html));
+  check("whip form offered as the alternative", html.includes("Whip Form"));
+
+  // Whip form: 1d4 instead, and 5 ft more reach.
+  seed({ whipForm: true });
+  html = render();
+  check("whip form rolls 1d4", /1d4[\s\S]{0,40}?8[\s\S]{0,40}?slashing/.test(html));
+  check("whip form reaches 10 ft", /10(<!-- -->)? ft/.test(html));
+  check("scythe form offered as the alternative", html.includes("Scythe Form"));
+
+  // Eldritch Maul adds 5 ft on top of whichever form is active.
+  seed({ whipForm: true, tattooMaulActive: true });
+  html = render();
+  check("whip plus maul reaches 15 ft", /15(<!-- -->)? ft/.test(html));
+
+  // Skills render above the tab bar, so they are visible whichever tab is open.
+  seed({});
+  html = render();
+  const skillsIndex = html.indexOf("Acrobatics");
+  const tabBarIndex = html.indexOf("cs-tabs");
+  check("skills are rendered", skillsIndex !== -1);
+  check("skills sit above the tab bar, outside any tab", skillsIndex !== -1 && skillsIndex < tabBarIndex);
+  check("skills sit below the status panel heading", html.indexOf("Skills") < html.indexOf("Concentrating"));
 } finally {
   await server.close();
 }

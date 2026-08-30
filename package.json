@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "check": "node scripts/render-smoke.mjs && node scripts/haste-check.mjs && node scripts/persistence-check.mjs"
+    "check": "node scripts/render-smoke.mjs && node scripts/derived-stats-check.mjs && node scripts/persistence-check.mjs"
   },
   "dependencies": {
     "react": "^19.2.4",
